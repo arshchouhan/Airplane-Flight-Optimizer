@@ -1,0 +1,4 @@
+E:/AIrplane Flight Optimizer/cpp/build/CMakeFiles/flight_optimizer.dir
+E:/AIrplane Flight Optimizer/cpp/build/CMakeFiles/run_optimizer.dir
+E:/AIrplane Flight Optimizer/cpp/build/CMakeFiles/edit_cache.dir
+E:/AIrplane Flight Optimizer/cpp/build/CMakeFiles/rebuild_cache.dir

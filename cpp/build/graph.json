@@ -1,0 +1,86 @@
+{
+  "airports": [
+    {
+      "id": 1,
+      "name": "John F. Kennedy International Airport",
+      "code": "JFK",
+      "position": {
+        "x": 20,
+        "y": 30
+      }
+    },
+    {
+      "id": 2,
+      "name": "Los Angeles International Airport",
+      "code": "LAX",
+      "position": {
+        "x": 80,
+        "y": 70
+      }
+    },
+    {
+      "id": 3,
+      "name": "O'Hare International Airport",
+      "code": "ORD",
+      "position": {
+        "x": 50,
+        "y": 40
+      }
+    },
+    {
+      "id": 4,
+      "name": "Dallas/Fort Worth International Airport",
+      "code": "DFW",
+      "position": {
+        "x": 40,
+        "y": 60
+      }
+    },
+    {
+      "id": 5,
+      "name": "Denver International Airport",
+      "code": "DEN",
+      "position": {
+        "x": 45,
+        "y": 50
+      }
+    }
+  ],
+  "routes": [
+    {
+      "source": 1,
+      "target": 3,
+      "distance": 1200
+    },
+    {
+      "source": 1,
+      "target": 4,
+      "distance": 1600
+    },
+    {
+      "source": 2,
+      "target": 3,
+      "distance": 2000
+    },
+    {
+      "source": 2,
+      "target": 4,
+      "distance": 1200
+    },
+    {
+      "source": 3,
+      "target": 4,
+      "distance": 800
+    },
+    {
+      "source": 3,
+      "target": 5,
+      "distance": 900
+    },
+    {
+      "source": 4,
+      "target": 5,
+      "distance": 700
+    }
+  ]
+}

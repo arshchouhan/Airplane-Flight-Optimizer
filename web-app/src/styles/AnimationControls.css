@@ -1,0 +1,113 @@
+.animation-controls {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px 20px;
+  border-radius: 30px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  align-items: center;
+  backdrop-filter: blur(5px);
+}
+
+.control-button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.control-button:hover {
+  background: #2563eb;
+  transform: scale(1.1);
+}
+
+.control-button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.speed-control {
+  position: relative;
+  margin-left: 5px;
+}
+
+.speed-button {
+  background: #e5e7eb;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.speed-button:hover {
+  background: #d1d5db;
+}
+
+.speed-options {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  z-index: 1001;
+  margin-bottom: 10px;
+  min-width: 120px;
+}
+
+.speed-option {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.speed-option:hover {
+  background: #f3f4f6;
+}
+
+.speed-option.active {
+  background: #3b82f6;
+  color: white;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .animation-controls {
+    padding: 8px 16px;
+    bottom: 10px;
+  }
+  
+  .control-button {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .speed-button {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+}

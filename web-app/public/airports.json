@@ -1,0 +1,49 @@
+{
+  "airports": [
+    {
+      "id": 1,
+      "name": "JFK International",
+      "code": "JFK",
+      "position": {
+        "x": 2,
+        "y": 3
+      }
+    },
+    {
+      "id": 2,
+      "name": "Heathrow",
+      "code": "LHR",
+      "position": {
+        "x": 7,
+        "y": 8
+      }
+    },
+    {
+      "id": 3,
+      "name": "Charles de Gaulle",
+      "code": "CDG",
+      "position": {
+        "x": 5,
+        "y": 5
+      }
+    },
+    {
+      "id": 4,
+      "name": "Dubai International",
+      "code": "DXB",
+      "position": {
+        "x": 8,
+        "y": 2
+      }
+    },
+    {
+      "id": 5,
+      "name": "Sydney Airport",
+      "code": "SYD",
+      "position": {
+        "x": 1,
+        "y": 9
+      }
+    }
+  ]
+}
