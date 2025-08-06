@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FaPlay, FaPause, FaUndo } from 'react-icons/fa';
 import '../styles/AnimationControls.css';
 

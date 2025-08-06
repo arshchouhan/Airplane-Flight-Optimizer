@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { FaPlane, FaMapMarkerAlt } from 'react-icons/fa';
+import { FaPlane } from 'react-icons/fa';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 
 // Inline styles for the components

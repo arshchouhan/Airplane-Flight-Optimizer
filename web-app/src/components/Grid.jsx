@@ -228,7 +228,7 @@ const Grid = () => {
       selectedAirportCount: selectedAirports.length,
       pathLength: shortestPath.length > 0 ? shortestPath.length - 1 : 0
     };
-  }, [airports.length, routes.length, selectedAirports.length, shortestPath.length]);
+  }, [airports.length, routes.length, selectedAirports.length, shortestPath]);
 
   return (
     <div className="grid-page">
