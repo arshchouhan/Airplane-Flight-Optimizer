@@ -1,27 +1,52 @@
 // This script is used by Vercel to build the application
 const { execSync } = require('child_process');
 const fs = require('fs');
+const path = require('path');
 
-console.log('Installing dependencies...');
-execSync('npm install', { stdio: 'inherit' });
+// Helper function to run commands with better error handling
+function runCommand(command, options = {}) {
+  console.log(`Running: ${command}`);
+  try {
+    execSync(command, { 
+      stdio: 'inherit',
+      ...options,
+      env: { 
+        ...process.env,
+        NODE_ENV: 'production',
+        CI: 'true',
+        NPM_CONFIG_PRODUCTION: 'false',
+        NPM_CONFIG_AUDIT: 'false',
+        NPM_CONFIG_FUND: 'false',
+        ...(options.env || {})
+      }
+    });
+    return true;
+  } catch (error) {
+    console.error(`Command failed: ${command}`, error);
+    process.exit(1);
+  }
+}
 
-console.log('Building application...');
-execSync('npm run build', { stdio: 'inherit' });
+// Main build process
+console.log('=== Starting Vercel Build ===');
+console.log('Current directory:', process.cwd());
 
-// Create a vercel.json file in the build directory
-const vercelConfig = {
-  "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "build" }
-    }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "/" }
-  ]
-};
+// Install dependencies
+console.log('\n=== Installing Dependencies ===');
+runCommand('npm install --prefer-offline --no-audit --progress=false');
 
-fs.writeFileSync('build/vercel.json', JSON.stringify(vercelConfig, null, 2));
-console.log('Vercel configuration file created.');
+// Build the application
+console.log('\n=== Building Application ===');
+runCommand('npm run build');
+
+// Verify build output
+const buildDir = path.join(process.cwd(), 'build');
+if (!fs.existsSync(buildDir)) {
+  console.error('Error: Build directory not found after build process');
+  process.exit(1);
+}
+
+console.log('\n=== Build Output ===');
+console.log(fs.readdirSync(buildDir));
+
+console.log('\n=== Vercel Build Completed Successfully ===');

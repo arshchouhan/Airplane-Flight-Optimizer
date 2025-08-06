@@ -5,11 +5,9 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
+    "start": "cd web-app && npm start",
     "build": "cd web-app && npm install && npm run build",
-    "vercel-build": "cd web-app && npm install && npm run build",
-    "dev": "concurrently \"node server.js\" \"cd web-app && npm start\"",
-    "install-all": "npm install && cd web-app && npm install"
+    "vercel-build": "cd web-app && npm install && npm run build"
   },
   "engines": {
     "node": ">=14.0.0",
