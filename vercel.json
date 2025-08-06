@@ -4,11 +4,17 @@
     {
       "src": "web-app/package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "build" }
+      "config": { 
+        "distDir": "build"
+      }
+    },
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
-    { "handle": "filesystem" },
-    { "src": "/.*", "dest": "/web-app/index.html" }
+    { "src": "/api/(.*)", "dest": "/api" },
+    { "src": "/(.*)", "dest": "/web-app" }
   ]
 }
