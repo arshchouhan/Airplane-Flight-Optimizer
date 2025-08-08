@@ -3,7 +3,6 @@ import useGraphData from '../hooks/useGraphData';
 import { normalizeCoordinates } from '../utils/projection';
 import GraphCanvas from './GraphCanvas';
 import Tooltip from './Tooltip';
-import DijkstraVisualizer from './DijkstraVisualizer';
 import PlaneAnimation from './PlaneAnimation';
 import AnimationControls from './AnimationControls';
 import '../styles/Grid.css';
@@ -20,8 +19,8 @@ const Grid = () => {
   });
   const [selectedAirports, setSelectedAirports] = useState([]);
   const [shortestPath, setShortestPath] = useState([]);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [animationSpeed, setAnimationSpeed] = useState(2); // 1-5
+  const [disabledAirports, setDisabledAirports] = useState(new Set());
+
   const containerRef = useRef(null);
 
   // Update container dimensions
@@ -61,8 +60,33 @@ const Grid = () => {
     });
   };
   
+  // Toggle airport disabled state
+  const toggleAirportDisabled = useCallback((airportId, event) => {
+    event.preventDefault(); // Prevent context menu
+    setDisabledAirports(prev => {
+      const newDisabled = new Set(prev);
+      if (newDisabled.has(airportId)) {
+        newDisabled.delete(airportId);
+      } else {
+        newDisabled.add(airportId);
+      }
+      return newDisabled;
+    });
+    
+    // Clear path if it includes the toggled airport
+    if (shortestPath.includes(String(airportId)) || 
+        selectedAirports.some(a => String(a.id) === String(airportId))) {
+      setShortestPath([]);
+    }
+  }, [selectedAirports, shortestPath]);
+  
   // Handle airport click for selection
   const handleAirportClick = useCallback((airport) => {
+    // Don't select disabled airports
+    if (disabledAirports.has(String(airport.id))) {
+      return;
+    }
+    
     setSelectedAirports(prev => {
       // If clicking the same airport, deselect it
       if (prev.some(a => a.id === airport.id)) {
@@ -81,7 +105,6 @@ const Grid = () => {
     // Reset animation state when selecting new airports
     if (shortestPath.length > 0) {
       setShortestPath([]);
-      setIsPlaying(false);
     }
   }, [shortestPath.length]);
   
@@ -90,6 +113,14 @@ const Grid = () => {
     console.log('Selected airports:', selectedAirports);
     if (selectedAirports.length !== 2) {
       console.log('Not enough airports selected, clearing path');
+      setShortestPath([]);
+      return;
+    }
+    
+    // Skip if either selected airport is disabled
+    if (disabledAirports.has(selectedAirports[0]?.id) || 
+        disabledAirports.has(selectedAirports[1]?.id)) {
+      console.log('One or both selected airports are disabled');
       setShortestPath([]);
       return;
     }
@@ -122,8 +153,14 @@ const Grid = () => {
         visited.add(node);
         
         // Find all connected airports
-        const outbound = routes.filter(r => String(r.source) === node).map(r => String(r.target));
-        const inbound = routes.filter(r => String(r.target) === node).map(r => String(r.source));
+        const outbound = routes
+          .filter(r => String(r.source) === node && !disabledAirports.has(String(r.target)))
+          .map(r => String(r.target));
+          
+        const inbound = routes
+          .filter(r => String(r.target) === node && !disabledAirports.has(String(r.source)))
+          .map(r => String(r.source));
+          
         const connections = [...outbound, ...inbound];
         
         console.log('  Connections from', node + ':', connections);
@@ -205,6 +242,17 @@ const Grid = () => {
   useEffect(() => {
     console.log('Routes count:', routes.length);
   }, [routes]);
+  
+  // Auto-play the animation when a path is found
+  useEffect(() => {
+    if (shortestPath.length > 1) {
+      // Auto-play the animation when a new path is set
+      const timer = setTimeout(() => {
+        // Animation will play automatically
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [shortestPath]);
 
   // Create a map of airport ID to IATA code for easy lookup
   const airportCodeMap = useMemo(() => {
@@ -232,49 +280,84 @@ const Grid = () => {
 
   return (
     <div className="grid-page">
-      {/* Info Panel */}
-      <div className="info-panel">
-        <div className="info-section">
-          <h4>Airports</h4>
+      {/* Left Panel */}
+      <div className="left-panel">
+        <div className="panel-header">
+          <h2>Flight Path Finder</h2>
+        </div>
+        
+        <div className="panel-section">
+          <h3>Airport Network</h3>
           <div className="info-row">
-            <span>Total:</span>
-            <span>{stats.totalAirports}</span>
+            <span>Total Airports:</span>
+            <span className="highlight">{stats.totalAirports}</span>
           </div>
+          <div className="info-row">
+            <span>Total Routes:</span>
+            <span className="highlight">{stats.totalRoutes}</span>
+          </div>
+        </div>
+
+        <div className="panel-section">
+          <h3>Selection</h3>
           <div className="info-row">
             <span>Selected:</span>
-            <span>{stats.selectedAirportCount}/2</span>
+            <span className="highlight">{stats.selectedAirportCount}/2</span>
           </div>
-        </div>
-        <div className="info-section">
-          <h4>Routes</h4>
-          <div className="info-row">
-            <span>Total:</span>
-            <span>{stats.totalRoutes}</span>
-          </div>
-          {stats.pathLength > 0 && (
-            <div className="info-row">
-              <span>Path Length:</span>
-              <span>{stats.pathLength} stops</span>
-            </div>
-          )}
-        </div>
-        {selectedAirports.length === 2 && (
-          <div className="info-section">
-            <h4>Selected</h4>
+          
+          {selectedAirports.length > 0 && (
             <div className="selected-airports">
               {selectedAirports.map((airport, index) => (
                 <div key={airport.id} className="selected-airport">
-                  <span className="airport-index">{index + 1}.</span>
-                  <span className="airport-name">{airport.name}</span>
-                  <span className="airport-code">({airport.id})</span>
+                  <div className="airport-header">
+                    <span className="airport-index">{index + 1}.</span>
+                    <span className="airport-code">{airport.iata || airport.id}</span>
+                  </div>
+                  <div className="airport-name">{airport.name}</div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+          
+          {stats.pathLength > 0 && (
+            <div className="path-info">
+              <div className="info-row">
+                <span>Path Length:</span>
+                <span className="highlight">{stats.pathLength} stops</span>
+              </div>
+              <div className="info-row">
+                <span>Total Distance:</span>
+                <span className="highlight">
+                  {shortestPath.length > 1 ? (
+                    shortestPath.slice(1).reduce((sum, targetId, i) => {
+                      const sourceId = shortestPath[i];
+                      // Convert both source and target to numbers for comparison
+                      const route = routes.find(r => 
+                        (Number(r.source) === Number(sourceId) && Number(r.target) === Number(targetId)) || 
+                        (Number(r.source) === Number(targetId) && Number(r.target) === Number(sourceId))
+                      );
+                      console.log(`Path segment: ${sourceId} -> ${targetId}`, 'Route found:', route);
+                      return sum + (route?.distance || 0);
+                    }, 0)
+                  ) : 0} km
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div className="panel-section">
+          <h3>Instructions</h3>
+          <ul className="instructions-list">
+            <li>• Click to select departure/arrival</li>
+            <li>• Right-click to disable/enable airports</li>
+            <li>• Select 2 airports to find the shortest path</li>
+          </ul>
+        </div>
       </div>
       
-      <div className="grid-container" ref={containerRef}>
+      <div className="main-content">
+        <div className="grid-container" ref={containerRef}>
         {isLoading ? (
           <div className="loading-overlay">
             <div className="loading-spinner" />
@@ -300,23 +383,9 @@ const Grid = () => {
               dimensions={dimensions}
               onAirportHover={handleAirportHover}
               onAirportClick={handleAirportClick}
-              selectedAirports={selectedAirports.map(airport => ({
-                ...airport,
-                id: airport.iata || String(airport.id)
-              }))}
-              highlightedPath={shortestPath.map(id => 
-                airportCodeMap.get(String(id)) || String(id)
-              )}
-            />
-            
-            <DijkstraVisualizer 
-              path={shortestPath.map(id => 
-                airportCodeMap.get(String(id)) || String(id)
-              )}
-              airports={normalizedAirports.map(airport => ({
-                ...airport,
-                id: airport.iata || String(airport.id)
-              }))}
+              onAirportRightClick={toggleAirportDisabled}
+              highlightedPath={shortestPath}
+              disabledAirports={disabledAirports}
             />
             
             {/* Plane Animation - Wrapped in a container with proper z-index */}
@@ -331,14 +400,13 @@ const Grid = () => {
               display: shortestPath.length > 1 ? 'block' : 'none' // Hide when no path
             }}>
               <PlaneAnimation
-                key={`${shortestPath.join('-')}-${isPlaying}`}
+                key={shortestPath.join('-')}
                 path={shortestPath}
                 airports={normalizedAirports}
-                speed={animationSpeed}
-                isPlaying={isPlaying}
+                speed={2}
+                isPlaying={true}
                 onComplete={() => {
                   console.log('Animation completed');
-                  setIsPlaying(false);
                 }}
               />
             </div>
@@ -350,26 +418,13 @@ const Grid = () => {
               airport={tooltip.airport}
             />
             
-            {/* Animation Controls */}
-            <AnimationControls
-              isPlaying={isPlaying}
-              onPlayPause={() => setIsPlaying(!isPlaying)}
-              onReset={() => {
-                setIsPlaying(false);
-                // Reset animation by briefly clearing and restoring the path
-                const currentPath = [...shortestPath];
-                setShortestPath([]);
-                setTimeout(() => setShortestPath(currentPath), 10);
-              }}
-              speed={animationSpeed}
-              onSpeedChange={setAnimationSpeed}
-              isPathCalculated={shortestPath.length > 1}
-            />
+
           </>
         )}
-      </div>
-      <div className="watermark">
-        <span>Airport Route Visualizer</span>
+        </div>
+        <div className="watermark">
+          <span>Airport Route Visualizer</span>
+        </div>
       </div>
     </div>
   );

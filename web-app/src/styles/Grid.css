@@ -8,35 +8,74 @@
   color: #f8fafc;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   display: flex;
-  flex-direction: column;
 }
 
-/* Info Panel */
-.info-panel {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  background-color: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(8px);
-  border-radius: 8px;
-  padding: 12px 16px;
-  z-index: 100;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  max-width: 280px;
+/* Left Panel */
+.left-panel {
+  width: 250px;
+  height: 100%;
+  background-color: #0f172a;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  overflow-y: auto;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
 }
 
-.info-section {
-  margin-bottom: 12px;
+/* Webkit Scrollbar Styling */
+.left-panel::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.info-section:not(:last-child) {
+.left-panel::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px 0;
+}
+
+.left-panel::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.5);
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+
+.left-panel::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.7);
+}
+
+.left-panel::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.panel-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 12px;
 }
 
-.info-section h4 {
-  margin: 0 0 8px 0;
+.panel-header h2 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.panel-section {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.panel-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.panel-section h3 {
+  margin: 0 0 12px 0;
   color: #94a3b8;
   font-size: 0.875rem;
   font-weight: 600;
@@ -47,55 +86,96 @@
 .info-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
   font-size: 0.875rem;
-}
-
-.info-row span:first-child {
   color: #cbd5e1;
-  margin-right: 12px;
 }
 
-.info-row span:last-child {
-  font-weight: 500;
+.info-row .highlight {
   color: #f8fafc;
+  font-weight: 500;
 }
 
 .selected-airports {
-  margin-top: 8px;
+  margin: 12px 0;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .selected-airport {
+  padding: 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.selected-airport:last-child {
+  margin-bottom: 0;
+}
+
+.airport-header {
   display: flex;
   align-items: center;
-  padding: 4px 0;
-  font-size: 0.875rem;
+  margin-bottom: 4px;
 }
 
 .airport-index {
-  color: #94a3b8;
-  margin-right: 8px;
-  min-width: 20px;
+  color: #60a5fa;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.airport-code {
+  color: #60a5fa;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 0.9em;
 }
 
 .airport-name {
-  flex: 1;
-  color: #f8fafc;
+  font-size: 0.8em;
+  color: #94a3b8;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.airport-code {
-  color: #60a5fa;
-  margin-left: 8px;
-  font-family: 'Fira Code', 'Courier New', monospace;
+.path-info {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.instructions-list {
+  margin: 0;
+  padding: 0 0 0 16px;
+  list-style-type: none;
+}
+
+.instructions-list li {
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+/* Main Content Area */
+.main-content {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .grid-container {
   position: relative;
   width: 100%;
-  height: 100%;
+  flex: 1;
   overflow: hidden;
 }
 

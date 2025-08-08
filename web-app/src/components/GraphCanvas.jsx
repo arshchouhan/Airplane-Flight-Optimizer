@@ -21,7 +21,9 @@ const GraphCanvas = ({
   dimensions = { width: 0, height: 0 },
   onAirportHover = () => {},
   onAirportClick = () => {},
-  highlightedPath = []
+  onAirportRightClick = () => {},
+  highlightedPath = [],
+  disabledAirports = new Set()
 }) => {
   // Normalize airport coordinates to fit the container
   const normalizedAirports = useMemo(() => {
@@ -55,12 +57,19 @@ const GraphCanvas = ({
         const isHighlighted = highlightedPath.includes(route.source) && 
                             highlightedPath.includes(route.target);
         
+        // Calculate midpoint for label positioning
+        const midX = (source.x + target.x) / 2;
+        const midY = (source.y + target.y) / 2;
+        
         return {
           id: `${route.source}-${route.target}`,
           x1: source.x,
           y1: source.y,
           x2: target.x,
           y2: target.y,
+          midX,
+          midY,
+          distance: route.distance, // Use the distance from graph.json
           isHighlighted
         };
       });
@@ -89,6 +98,11 @@ const GraphCanvas = ({
     onAirportClick(airport);
   };
 
+  const handleAirportContextMenu = (e, airport) => {
+    e.preventDefault();
+    onAirportRightClick(airport.id, e);
+  };
+
   if (!dimensions.width || !dimensions.height) {
     return null;
   }
@@ -102,36 +116,76 @@ const GraphCanvas = ({
         height={dimensions.height}
       >
         {routePaths.map(route => (
-          <line
-            key={route.id}
-            x1={route.x1}
-            y1={route.y1}
-            x2={route.x2}
-            y2={route.y2}
-            className={`route ${route.isHighlighted ? 'highlighted' : ''}`}
-          />
+          <g key={route.id}>
+            <line
+              x1={route.x1}
+              y1={route.y1}
+              x2={route.x2}
+              y2={route.y2}
+              className={`route ${route.isHighlighted ? 'highlighted' : ''}`}
+            />
+            {route.distance && (
+              <text
+                x={route.midX}
+                y={route.midY}
+                className="route-label"
+                textAnchor="middle"
+                dy=".3em"
+                style={{
+                  fill: '#fff',
+                  fontSize: '10px',
+                  textShadow: '0 0 3px #000',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  fontWeight: 'bold',
+                  paintOrder: 'stroke',
+                  stroke: '#000',
+                  strokeWidth: '2px',
+                  strokeLinecap: 'butt',
+                  strokeLinejoin: 'miter',
+                }}
+              >
+                {route.distance}km
+              </text>
+            )}
+          </g>
         ))}
       </svg>
 
       {/* Airports */}
       <div className="airports-layer">
-        {visibleAirports.map(airport => (
-          <div
-            key={airport.id}
-            className={`airport ${highlightedPath.includes(airport.id) ? 'highlighted' : ''}`}
-            style={{
-              left: `${airport.x}px`,
-              top: `${airport.y}px`,
-              transform: 'translate(-50%, -50%)',
-            }}
-            onMouseEnter={(e) => handleAirportMouseEnter(e, airport)}
-            onMouseLeave={() => onAirportHover(null, null)}
-            onClick={(e) => handleAirportClick(e, airport)}
-          >
-            <FaPlane className="airport-icon" />
-            <span className="airport-code">{airport.id}</span>
-          </div>
-        ))}
+        {visibleAirports.map(airport => {
+          const isDisabled = disabledAirports.has(String(airport.id));
+          const isHighlighted = highlightedPath.includes(airport.id);
+          
+          return (
+            <div
+              key={airport.id}
+              className={`airport ${isHighlighted ? 'highlighted' : ''} ${isDisabled ? 'disabled' : ''}`}
+              style={{
+                left: `${airport.x}px`,
+                top: `${airport.y}px`,
+                transform: 'translate(-50%, -50%)',
+                position: 'absolute',
+                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                zIndex: 10,
+                opacity: isDisabled ? 0.5 : 1,
+                filter: isDisabled ? 'grayscale(100%)' : 'none',
+              }}
+              onMouseEnter={(e) => !isDisabled && handleAirportMouseEnter(e, airport)}
+              onMouseLeave={() => onAirportHover(null)}
+              onClick={(e) => !isDisabled && handleAirportClick(e, airport)}
+              onContextMenu={(e) => handleAirportContextMenu(e, airport)}
+              title={isDisabled ? 'Right-click to enable' : 'Right-click to disable'}
+            >
+              <FaPlane size={24} color="white" />
+              {isHighlighted && (
+                <div className="airport-pulse" />
+              )}
+              <span className="airport-code">{airport.id}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
