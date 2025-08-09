@@ -20,6 +20,7 @@ const Grid = () => {
   const [selectedAirports, setSelectedAirports] = useState([]);
   const [shortestPath, setShortestPath] = useState([]);
   const [disabledAirports, setDisabledAirports] = useState(new Set());
+  const [edgeDelays, setEdgeDelays] = useState({});
 
   const containerRef = useRef(null);
 
@@ -60,8 +61,8 @@ const Grid = () => {
     });
   };
   
-  // Toggle airport disabled state
-  const toggleAirportDisabled = useCallback((airportId, event) => {
+  // Handle right-click on airport (toggle disabled state)
+  const handleAirportRightClick = useCallback((airportId, event) => {
     event.preventDefault(); // Prevent context menu
     setDisabledAirports(prev => {
       const newDisabled = new Set(prev);
@@ -80,6 +81,19 @@ const Grid = () => {
     }
   }, [selectedAirports, shortestPath]);
   
+  // Handle edge delay change from GraphCanvas
+  const handleEdgeDelayChange = useCallback((edgeId, delay) => {
+    setEdgeDelays(prev => ({
+      ...prev,
+      [edgeId]: delay
+    }));
+    
+    // Clear the current path since delays have changed
+    if (shortestPath.length > 0) {
+      setShortestPath([]);
+    }
+  }, [shortestPath]);
+
   // Handle airport click for selection
   const handleAirportClick = useCallback((airport) => {
     // Don't select disabled airports
@@ -108,6 +122,24 @@ const Grid = () => {
     }
   }, [shortestPath.length]);
   
+  // Create a function to get the effective weight of an edge (distance + delay)
+  const getEdgeWeight = useCallback((source, target) => {
+    // Find the route between source and target
+    const route = routes.find(r => 
+      (String(r.source) === source && String(r.target) === target) ||
+      (String(r.source) === target && String(r.target) === source)
+    );
+    
+    if (!route) return Infinity;
+    
+    // Get the delay for this route (in minutes, convert to km equivalent)
+    // Assuming an average flight speed of 800 km/h, so 1 minute ≈ 13.33 km
+    const delayInKm = (edgeDelays[`${route.source}-${route.target}`] || 0) * 13.33;
+    
+    // Total weight is distance plus delay converted to km
+    return route.distance + delayInKm;
+  }, [routes, edgeDelays]);
+
   // Find shortest path between selected airports
   useEffect(() => {
     console.log('Selected airports:', selectedAirports);
@@ -125,62 +157,98 @@ const Grid = () => {
       return;
     }
     
-    // Simple BFS to find shortest path (replace with your Dijkstra's implementation)
+    // Dijkstra's algorithm to find shortest path based on distance + delay
     const [start, end] = selectedAirports;
-    console.log('Finding path from', start, 'to', end);
+    console.log('Finding shortest path from', start, 'to', end);
     
-    // Ensure we're using string IDs for the path
     const startNode = String(start.id);
     const endNode = String(end.id);
-    const queue = [[startNode]];
-    const visited = new Set();
     
-    console.log('Starting BFS with queue:', queue);
+    // Create a map to store the shortest distance to each node
+    const distances = {};
+    // Create a map to store the previous node in the optimal path
+    const previous = {};
+    // Create a priority queue (using an array for simplicity)
+    const unvisited = new Set();
     
-    while (queue.length > 0) {
-      const path = queue.shift();
-      const node = path[path.length - 1];
+    // Initialize distances to infinity and previous nodes to null
+    airports.forEach(airport => {
+      const id = String(airport.id);
+      distances[id] = Infinity;
+      previous[id] = null;
+      unvisited.add(id);
+    });
+    
+    // Distance from start to start is 0
+    distances[startNode] = 0;
+    
+    while (unvisited.size > 0) {
+      // Find the unvisited node with the smallest distance
+      let current = null;
+      let smallestDistance = Infinity;
       
-      console.log('Visiting node:', node, 'with path:', path);
-      
-      if (node === endNode) {
-        console.log('Found path:', path);
-        setShortestPath(path);
-        return;
+      for (const node of unvisited) {
+        if (distances[node] < smallestDistance) {
+          smallestDistance = distances[node];
+          current = node;
+        }
       }
       
-      if (!visited.has(node)) {
-        visited.add(node);
+      // If we can't find a node or we've reached the end, we're done
+      if (current === null || current === endNode) {
+        break;
+      }
+      
+      // Remove current node from unvisited set
+      unvisited.delete(current);
+      
+      // Find all neighbors of current node
+      const neighbors = [
+        ...routes
+          .filter(r => String(r.source) === current && !disabledAirports.has(String(r.target)))
+          .map(r => ({
+            id: String(r.target),
+            weight: getEdgeWeight(current, String(r.target))
+          })),
+        ...routes
+          .filter(r => String(r.target) === current && !disabledAirports.has(String(r.source)))
+          .map(r => ({
+            id: String(r.source),
+            weight: getEdgeWeight(current, String(r.source))
+          }))
+      ];
+      
+      // Update distances to neighbors
+      for (const neighbor of neighbors) {
+        if (!unvisited.has(neighbor.id)) continue;
         
-        // Find all connected airports
-        const outbound = routes
-          .filter(r => String(r.source) === node && !disabledAirports.has(String(r.target)))
-          .map(r => String(r.target));
-          
-        const inbound = routes
-          .filter(r => String(r.target) === node && !disabledAirports.has(String(r.source)))
-          .map(r => String(r.source));
-          
-        const connections = [...outbound, ...inbound];
+        const distance = distances[current] + neighbor.weight;
         
-        console.log('  Connections from', node + ':', connections);
-        
-        // Add new paths to queue
-        connections.forEach(neighbor => {
-          if (!visited.has(neighbor)) {
-            const newPath = [...path, neighbor];
-            console.log('  Adding to queue:', newPath);
-            queue.push(newPath);
-          }
-        });
+        if (distance < distances[neighbor.id]) {
+          distances[neighbor.id] = distance;
+          previous[neighbor.id] = current;
+        }
       }
     }
     
-    console.log('No path found from', startNode, 'to', endNode);
-    setShortestPath([]);
+    // Reconstruct the path
+    const path = [];
+    let current = endNode;
     
-    // If we get here, no path was found
-    setShortestPath([]);
+    if (previous[current] || current === startNode) {
+      while (current) {
+        path.unshift(current);
+        current = previous[current];
+      }
+    }
+    
+    if (path.length > 0) {
+      console.log('Found shortest path:', path, 'with distance:', distances[endNode]);
+      setShortestPath(path);
+    } else {
+      console.log('No path found from', startNode, 'to', endNode);
+      setShortestPath([]);
+    }
   }, [selectedAirports, routes]);
   
   // Normalize airport coordinates for rendering
@@ -263,6 +331,21 @@ const Grid = () => {
     return map;
   }, [airports]);
 
+  // Helper function to calculate flight time in minutes (including delays)
+  const calculateFlightTime = useCallback((distance, delay = 0) => {
+    // Assuming 800 km/h average speed
+    const flightTime = Math.round((distance / 800) * 60);
+    return flightTime + (delay || 0);
+  }, []);
+
+  // Format time as "Xh Ym" or "Xm" if less than 60 minutes
+  const formatTime = useCallback((minutes) => {
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h${mins > 0 ? ` ${mins}m` : ''}`;
+  }, []);
+
   // Calculate statistics for the info panel
   const stats = useMemo(() => {
     console.log('Updating stats:', { 
@@ -270,13 +353,37 @@ const Grid = () => {
       shortestPathLength: shortestPath.length,
       shortestPath: shortestPath
     });
+
+    let totalDistance = 0;
+    let totalTime = 0;
+    
+    if (shortestPath.length > 1) {
+      totalDistance = shortestPath.slice(1).reduce((sum, targetId, i) => {
+        const sourceId = shortestPath[i];
+        const route = routes.find(r => 
+          (Number(r.source) === Number(sourceId) && Number(r.target) === Number(targetId)) || 
+          (Number(r.source) === Number(targetId) && Number(r.target) === Number(sourceId))
+        );
+        
+        if (route) {
+          const routeId = `${route.source}-${route.target}`;
+          const delay = edgeDelays[routeId] || 0;
+          totalTime += calculateFlightTime(route.distance, delay);
+          return sum + route.distance;
+        }
+        return sum;
+      }, 0);
+    }
+
     return {
       totalAirports: airports.length,
       totalRoutes: routes.length,
       selectedAirportCount: selectedAirports.length,
-      pathLength: shortestPath.length > 0 ? shortestPath.length - 1 : 0
+      pathLength: shortestPath.length > 0 ? shortestPath.length - 1 : 0,
+      totalDistance,
+      totalTime
     };
-  }, [airports.length, routes.length, selectedAirports.length, shortestPath]);
+  }, [airports.length, routes, selectedAirports.length, shortestPath, edgeDelays, calculateFlightTime]);
 
   return (
     <div className="grid-page">
@@ -327,20 +434,11 @@ const Grid = () => {
               </div>
               <div className="info-row">
                 <span>Total Distance:</span>
-                <span className="highlight">
-                  {shortestPath.length > 1 ? (
-                    shortestPath.slice(1).reduce((sum, targetId, i) => {
-                      const sourceId = shortestPath[i];
-                      // Convert both source and target to numbers for comparison
-                      const route = routes.find(r => 
-                        (Number(r.source) === Number(sourceId) && Number(r.target) === Number(targetId)) || 
-                        (Number(r.source) === Number(targetId) && Number(r.target) === Number(sourceId))
-                      );
-                      console.log(`Path segment: ${sourceId} -> ${targetId}`, 'Route found:', route);
-                      return sum + (route?.distance || 0);
-                    }, 0)
-                  ) : 0} km
-                </span>
+                <span className="highlight">{stats.totalDistance.toLocaleString()} km</span>
+              </div>
+              <div className="info-row">
+                <span>Total Time:</span>
+                <span className="highlight">{formatTime(stats.totalTime)}</span>
               </div>
             </div>
           )}
@@ -383,9 +481,11 @@ const Grid = () => {
               dimensions={dimensions}
               onAirportHover={handleAirportHover}
               onAirportClick={handleAirportClick}
-              onAirportRightClick={toggleAirportDisabled}
+              onAirportRightClick={handleAirportRightClick}
               highlightedPath={shortestPath}
               disabledAirports={disabledAirports}
+              edgeDelays={edgeDelays}
+              onEdgeDelayChange={handleEdgeDelayChange}
             />
             
             {/* Plane Animation - Wrapped in a container with proper z-index */}

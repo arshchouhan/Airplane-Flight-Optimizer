@@ -25,8 +25,13 @@ const useGraphData = () => {
       }
       const data = await response.json();
       
-      // Transform data if needed
-      const airports = data.airports || [];
+      // Transform data
+      const airports = (data.airports || []).map((airport, index) => ({
+        ...airport,
+        name: `Airport ${index + 1}`,
+        originalName: airport.name // Keep original name in case it's needed
+      }));
+      
       const routes = data.routes || [];
       
       setGraph({ airports, routes });

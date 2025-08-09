@@ -92,16 +92,18 @@ const styles = {
     zIndex: 2,
     filter: 'drop-shadow(0 2px 8px rgba(99, 102, 107, 0.7))',
     color: '#6366f1',
-    fontSize: '28px'
+    fontSize: '48px',
+    transition: 'all 0.3s ease'
   },
   glow: {
     position: 'absolute',
-    width: '24px',
-    height: '24px',
-    background: 'radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 80%)',
+    width: '60px',
+    height: '60px',
+    background: 'radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, transparent 70%)',
     borderRadius: '50%',
     zIndex: 1,
-    opacity: 0.7
+    opacity: 0.8,
+    transition: 'all 0.3s ease'
   },
   // Removing the trail effect completely as it was causing the random green circle
   trail: {
@@ -415,10 +417,7 @@ const PlaneAnimation = ({
       {/* Add keyframes for pulse animation */}
       <style>{pulseKeyframes}</style>
       
-      {/* Progress Indicator */}
-      <div style={styles.progressIndicator}>
-        {currentIndex + 1} of {path.length} segments
-      </div>
+      {/* Progress Indicator Removed */}
     </div>
   );
 };

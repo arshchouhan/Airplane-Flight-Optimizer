@@ -1,7 +1,8 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import PropTypes from 'prop-types';
-import { FaPlane } from 'react-icons/fa';
+import { FaPlane, FaPlaneArrival, FaPlaneDeparture } from 'react-icons/fa';
 import { normalizeCoordinates } from '../utils/projection';
+import EdgeDetailsModal from './EdgeDetailsModal';
 import '../styles/GraphCanvas.css';
 
 /**
@@ -23,7 +24,9 @@ const GraphCanvas = ({
   onAirportClick = () => {},
   onAirportRightClick = () => {},
   highlightedPath = [],
-  disabledAirports = new Set()
+  disabledAirports = new Set(),
+  edgeDelays = {},
+  onEdgeDelayChange = () => {}
 }) => {
   // Normalize airport coordinates to fit the container
   const normalizedAirports = useMemo(() => {
@@ -37,6 +40,44 @@ const GraphCanvas = ({
       dimensions
     );
   }, [airports, dimensions]);
+
+  // State for selected edge
+  const [selectedEdge, setSelectedEdge] = useState(null);
+
+  // Handle edge click
+  const handleEdgeClick = useCallback((e, route) => {
+    e.stopPropagation();
+    console.log('Edge clicked:', route);
+    setSelectedEdge({
+      ...route,
+      // Add source and target names for the modal
+      sourceName: airports.find(a => a.id === route.source)?.name || `Airport ${route.source}`,
+      targetName: airports.find(a => a.id === route.target)?.name || `Airport ${route.target}`,
+      // Initialize delay if it exists, otherwise default to 0
+      delay: edgeDelays[route.id] || 0
+    });
+  }, [airports, edgeDelays]);
+  
+  // Handle delay changes from the modal
+  const handleDelayChange = useCallback((edgeId, delay) => {
+    onEdgeDelayChange(edgeId, delay);
+    
+    // You can add additional logic here to trigger path recalculation
+    console.log(`Delay for edge ${edgeId} changed to ${delay} minutes`);
+  }, [onEdgeDelayChange]);
+
+  // Close modal
+  const closeModal = useCallback(() => {
+    setSelectedEdge(null);
+  }, []);
+
+  // Get delay class based on delay value
+  const getDelayClass = useCallback((delay) => {
+    if (!delay || delay <= 0) return '';
+    if (delay <= 30) return 'delay-low';
+    if (delay <= 60) return 'delay-medium';
+    return 'delay-high';
+  }, []);
 
   // Memoize route paths
   const routePaths = useMemo(() => {
@@ -54,15 +95,24 @@ const GraphCanvas = ({
       .map(route => {
         const source = airportMap.get(route.source);
         const target = airportMap.get(route.target);
-        const isHighlighted = highlightedPath.includes(route.source) && 
-                            highlightedPath.includes(route.target);
+        const routeId = `${route.source}-${route.target}`;
+        const delay = edgeDelays[routeId] || 0;
+        
+        // Check if this route is part of the highlighted path
+        const sourceIndex = highlightedPath.indexOf(route.source);
+        const targetIndex = highlightedPath.indexOf(route.target);
+        const isHighlighted = sourceIndex >= 0 && 
+                            targetIndex >= 0 && 
+                            Math.abs(sourceIndex - targetIndex) === 1;
         
         // Calculate midpoint for label positioning
         const midX = (source.x + target.x) / 2;
         const midY = (source.y + target.y) / 2;
         
         return {
-          id: `${route.source}-${route.target}`,
+          id: routeId,
+          source: route.source,
+          target: route.target,
           x1: source.x,
           y1: source.y,
           x2: target.x,
@@ -70,10 +120,12 @@ const GraphCanvas = ({
           midX,
           midY,
           distance: route.distance, // Use the distance from graph.json
+          delay,
+          delayClass: getDelayClass(delay),
           isHighlighted
         };
       });
-  }, [normalizedAirports, routes, highlightedPath]);
+  }, [normalizedAirports, routes, highlightedPath, edgeDelays, getDelayClass]);
 
   // Check if a point is in the viewport
   const isInViewport = useCallback((x, y) => {
@@ -109,50 +161,77 @@ const GraphCanvas = ({
 
   return (
     <div className="graph-canvas">
-      {/* Routes */}
+      {selectedEdge && (
+        <EdgeDetailsModal
+          edge={selectedEdge}
+          onClose={() => setSelectedEdge(null)}
+          onDelayChange={handleDelayChange}
+        />
+      )}
+      {/* Routes - Rendered first in DOM but visually behind airports */}
       <svg 
         className="routes-layer" 
-        width={dimensions.width} 
+        width={dimensions.width}
         height={dimensions.height}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          zIndex: 1
+        }}
       >
         {routePaths.map(route => (
-          <g key={route.id}>
+          <g key={route.id} className="route-group">
+            {/* Thick transparent clickable area */}
             <line
               x1={route.x1}
               y1={route.y1}
               x2={route.x2}
               y2={route.y2}
-              className={`route ${route.isHighlighted ? 'highlighted' : ''}`}
+              className="clickable-route"
+              onClick={(e) => handleEdgeClick(e, route)}
+              data-route-id={`${route.source}-${route.target}`}
             />
+            
+            {/* Visual route line */}
+            <line
+              className={`route ${route.isHighlighted ? 'highlighted' : ''} ${route.delayClass || ''}`}
+              x1={route.x1}
+              y1={route.y1}
+              x2={route.x2}
+              y2={route.y2}
+              strokeWidth={route.isHighlighted ? 8 : 6}
+              strokeLinecap="round"
+            />
+            
             {route.distance && (
-              <text
-                x={route.midX}
-                y={route.midY}
-                className="route-label"
-                textAnchor="middle"
-                dy=".3em"
-                style={{
-                  fill: '#fff',
-                  fontSize: '10px',
-                  textShadow: '0 0 3px #000',
-                  pointerEvents: 'none',
-                  userSelect: 'none',
-                  fontWeight: 'bold',
-                  paintOrder: 'stroke',
-                  stroke: '#000',
-                  strokeWidth: '2px',
-                  strokeLinecap: 'butt',
-                  strokeLinejoin: 'miter',
-                }}
-              >
-                {route.distance}km
-              </text>
+              <g className="route-label-group">
+                {/* Background for better readability */}
+                <text
+                  x={route.midX}
+                  y={route.midY}
+                  className={`route-label route-label-bg ${route.delayClass ? route.delayClass + '-bg' : ''}`}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
+                  {route.distance} km{route.delay > 0 ? ` (+${route.delay}m)` : ''}
+                </text>
+                <text
+                  x={route.midX}
+                  y={route.midY}
+                  className={`route-label ${route.delayClass ? route.delayClass + '-text' : ''}`}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
+                  {route.distance} km{route.delay > 0 ? ` (+${route.delay}m)` : ''}
+                </text>
+              </g>
             )}
           </g>
         ))}
       </svg>
 
-      {/* Airports */}
+      {/* Airports - Rendered second in DOM but visually on top */}
       <div className="airports-layer">
         {visibleAirports.map(airport => {
           const isDisabled = disabledAirports.has(String(airport.id));
@@ -167,8 +246,8 @@ const GraphCanvas = ({
                 top: `${airport.y}px`,
                 transform: 'translate(-50%, -50%)',
                 position: 'absolute',
-                cursor: isDisabled ? 'not-allowed' : 'pointer',
                 zIndex: 10,
+                cursor: isDisabled ? 'not-allowed' : 'pointer',
                 opacity: isDisabled ? 0.5 : 1,
                 filter: isDisabled ? 'grayscale(100%)' : 'none',
               }}
@@ -176,13 +255,12 @@ const GraphCanvas = ({
               onMouseLeave={() => onAirportHover(null)}
               onClick={(e) => !isDisabled && handleAirportClick(e, airport)}
               onContextMenu={(e) => handleAirportContextMenu(e, airport)}
-              title={isDisabled ? 'Right-click to enable' : 'Right-click to disable'}
+              title={`${airport.name}${isDisabled ? ' (Right-click to enable)' : ' (Right-click to disable)'}`}
             >
-              <FaPlane size={24} color="white" />
+              <FaPlane className="airport-icon" />
               {isHighlighted && (
                 <div className="airport-pulse" />
               )}
-              <span className="airport-code">{airport.id}</span>
             </div>
           );
         })}

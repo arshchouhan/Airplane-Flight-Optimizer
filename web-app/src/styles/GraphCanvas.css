@@ -4,10 +4,12 @@
   height: 100%;
   overflow: hidden;
   background-color: #0f172a;
+  touch-action: none; /* Prevent touch events from causing scroll */
   background-image: 
     linear-gradient(rgba(203, 213, 225, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(203, 213, 225, 0.05) 1px, transparent 1px);
   background-size: 40px 40px;
+  background-position: -1px -1px;
 }
 
 /* Routes layer */
@@ -17,26 +19,116 @@
   left: 0;
   width: 100%;
   height: 100%;
+  /* Let clicks pass through to the clickable lines */
   pointer-events: none;
+  z-index: 1;
 }
 
+/* Delay severity styles */
+.delay-low {
+  stroke: #60a5fa; /* Blue */
+  stroke-dasharray: 8, 4;
+  animation: dash-animation 2s linear infinite;
+}
+
+.delay-medium {
+  stroke: #fbbf24; /* Yellow */
+  stroke-dasharray: 6, 3;
+  animation: dash-animation 1.5s linear infinite;
+}
+
+.delay-high {
+  stroke: #f87171; /* Red */
+  stroke-dasharray: 4, 2;
+  animation: dash-animation 1s linear infinite;
+  stroke-width: 8px !important;
+}
+
+@keyframes dash-animation {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+/* Modern Route Styles */
 .route {
-  stroke: rgba(148, 163, 184, 0.2);
-  stroke-width: 1;
-  transition: stroke 0.2s ease;
+  stroke: #a0aec0;
+  stroke-width: 2;
+  stroke-linecap: round;
+  fill: none;
+  transition: all 0.2s ease;
+  pointer-events: none; /* Prevent the visual line from blocking clicks */
+}
+
+/* Route distance label */
+.route-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: #f8fafc;
+  text-shadow: 
+    -1px -1px 3px #0f172a,
+    1px -1px 3px #0f172a,
+    -1px 1px 3px #0f172a,
+    1px 1px 3px #0f172a;
+  pointer-events: none;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+/* Background for better readability */
+.route-label-bg {
+  stroke: #0f172a;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  opacity: 0.7;
+  paint-order: stroke;
+}
+
+/* Clickable route area */
+.clickable-route {
+  stroke: transparent;
+  stroke-width: 20; /* Even wider clickable area */
+  cursor: pointer;
+  pointer-events: all; /* Make sure clicks are captured */
+  transition: all 0.1s ease;
+}
+
+.clickable-route:hover {
+  stroke: rgba(66, 153, 225, 0.2); /* Slight highlight on hover */
+  stroke-width: 24; /* Slightly wider on hover */
+}
+
+/* Highlight effect when hovering over clickable route */
+.clickable-route:hover ~ .route {
+  stroke: #60A5FA !important;
+  stroke-width: 8px !important;
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 4px rgba(96, 165, 250, 0.8));
+}
+
+.route.delayed {
+  stroke: #D64550; /* Coral red */
+  stroke-width: 7px;
+  stroke-dasharray: 8, 6;
+  opacity: 0.9;
+}
+
+.route.highlighted.delayed {
+  stroke: #FF6B6B; /* Brighter coral */
+  stroke-width: 8px;
+  stroke-dasharray: 10, 6;
+  filter: drop-shadow(0 0 10px rgba(255, 107, 107, 0.6));
+  animation: dash 1s linear infinite;
+  opacity: 1;
 }
 
 .route.highlighted {
-  stroke: #3b82f6;
-  stroke-width: 2;
-  stroke-dasharray: 5, 5;
-  animation: dash 1s linear infinite;
-}
-
-@keyframes dash {
-  to {
-    stroke-dashoffset: 10;
-  }
+  stroke: #4ECDC4; /* Bright teal */
+  stroke-width: 8px;
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 10px rgba(78, 205, 196, 0.6));
+  animation: pulse 1.5s infinite ease-in-out;
+  opacity: 1;
 }
 
 /* Airports layer */
@@ -46,22 +138,39 @@
   left: 0;
   width: 100%;
   height: 100%;
+  z-index: 2;
+  pointer-events: none; /* Let clicks pass through to routes */
+}
+
+.airports-layer .airport {
+  pointer-events: auto; /* But keep clicks on airports */
 }
 
 .airport {
   position: absolute;
-  width: 30px;
-  height: 30px;
-  background-color: #1976D2;
-  border: 2px solid white;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #6B4EFF, #4A6FA5);
+  border: 3px solid #FFFFFF;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 10;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
+  z-index: 20;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  color: white;
+  pointer-events: auto;
+}
+
+.airport-icon {
+  width: 24px;
+  height: 24px;
+  color: white;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
+  /* Removed rotation to keep planes straight */
+  margin-right: 0;
 }
 
 .airport:hover {
@@ -91,10 +200,37 @@
   z-index: -1;
 }
 
-.run-dijkstra-button {
+.reset-delays-button {
   position: absolute;
   top: 20px;
   right: 20px;
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  z-index: 1000;
+}
+
+.reset-delays-button:hover {
+  background: #d32f2f;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.reset-delays-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.run-dijkstra-button {
+  position: absolute;
+  top: 20px;
+  right: 150px;
   background: #4CAF50;
   color: white;
   border: none;

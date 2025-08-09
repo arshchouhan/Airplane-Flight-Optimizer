@@ -5,8 +5,8 @@
       "name": "Seattle-Tacoma International Airport",
       "code": "SEA",
       "position": {
-        "x": 15,
-        "y": 25
+        "x": 20,
+        "y": 30
       }
     },
     {
@@ -14,8 +14,8 @@
       "name": "O'Hare International Airport",
       "code": "ORD",
       "position": {
-        "x": 45,
-        "y": 15
+        "x": 50,
+        "y": 25
       }
     },
     {
@@ -24,7 +24,7 @@
       "code": "JFK",
       "position": {
         "x": 80,
-        "y": 25
+        "y": 30
       }
     },
     {
@@ -33,7 +33,7 @@
       "code": "SFO",
       "position": {
         "x": 25,
-        "y": 45
+        "y": 50
       }
     },
     {
@@ -42,7 +42,7 @@
       "code": "DEN",
       "position": {
         "x": 50,
-        "y": 50
+        "y": 55
       }
     },
     {
@@ -51,7 +51,7 @@
       "code": "ATL",
       "position": {
         "x": 75,
-        "y": 55
+        "y": 60
       }
     },
     {
@@ -59,7 +59,7 @@
       "name": "Los Angeles International Airport",
       "code": "LAX",
       "position": {
-        "x": 15,
+        "x": 20,
         "y": 75
       }
     },
@@ -68,7 +68,7 @@
       "name": "Dallas/Fort Worth International Airport",
       "code": "DFW",
       "position": {
-        "x": 45,
+        "x": 50,
         "y": 85
       }
     },
@@ -80,9 +80,100 @@
         "x": 80,
         "y": 75
       }
+    },
+    {
+      "id": 10,
+      "name": "Minneapolis-Saint Paul International Airport",
+      "code": "MSP",
+      "position": {
+        "x": 40,
+        "y": 10
+      }
+    },
+    {
+      "id": 11,
+      "name": "Detroit Metropolitan Airport",
+      "code": "DTW",
+      "position": {
+        "x": 70,
+        "y": 10
+      }
+    },
+    {
+      "id": 12,
+      "name": "Houston George Bush Intercontinental Airport",
+      "code": "IAH",
+      "position": {
+        "x": 40,
+        "y": 95
+      }
+    },
+    {
+      "id": 13,
+      "name": "Tampa International Airport",
+      "code": "TPA",
+      "position": {
+        "x": 75,
+        "y": 95
+      }
+    },
+    {
+      "id": 14,
+      "name": "Portland International Airport",
+      "code": "PDX",
+      "position": {
+        "x": 5,
+        "y": 20
+      }
+    },
+    {
+      "id": 15,
+      "name": "San Diego International Airport",
+      "code": "SAN",
+      "position": {
+        "x": 5,
+        "y": 60
+      }
+    },
+    {
+      "id": 16,
+      "name": "Boston Logan International Airport",
+      "code": "BOS",
+      "position": {
+        "x": 90,
+        "y": 15
+      }
+    },
+    {
+      "id": 17,
+      "name": "Orlando International Airport",
+      "code": "MCO",
+      "position": {
+        "x": 90,
+        "y": 70
+      }
+    },
+    {
+      "id": 18,
+      "name": "Honolulu International Airport",
+      "code": "HNL",
+      "position": {
+        "x": 10,
+        "y": 90
+      }
     }
   ],
   "routes": [
+    {
+      "source": 18,
+      "target": 7,
+      "distance": 2600
+    },
+    {
+      "source": 18,
+      "target": 15,
+      "distance": 2800
+    },
     {
       "source": 1,
       "target": 2,
@@ -162,6 +253,86 @@
       "source": 5,
       "target": 9,
       "distance": 1600
+    },
+    {
+      "source": 2,
+      "target": 10,
+      "distance": 400
+    },
+    {
+      "source": 10,
+      "target": 1,
+      "distance": 2500
+    },
+    {
+      "source": 2,
+      "target": 11,
+      "distance": 350
+    },
+    {
+      "source": 11,
+      "target": 3,
+      "distance": 600
+    },
+    {
+      "source": 8,
+      "target": 12,
+      "distance": 400
+    },
+    {
+      "source": 12,
+      "target": 9,
+      "distance": 900
+    },
+    {
+      "source": 9,
+      "target": 13,
+      "distance": 300
+    },
+    {
+      "source": 6,
+      "target": 13,
+      "distance": 500
+    },
+    {
+      "source": 1,
+      "target": 14,
+      "distance": 200
+    },
+    {
+      "source": 14,
+      "target": 4,
+      "distance": 1000
+    },
+    {
+      "source": 7,
+      "target": 15,
+      "distance": 150
+    },
+    {
+      "source": 15,
+      "target": 4,
+      "distance": 500
+    },
+    {
+      "source": 3,
+      "target": 16,
+      "distance": 350
+    },
+    {
+      "source": 16,
+      "target": 2,
+      "distance": 900
+    },
+    {
+      "source": 9,
+      "target": 17,
+      "distance": 300
+    },
+    {
+      "source": 17,
+      "target": 6,
+      "distance": 700
     }
   ]
 }

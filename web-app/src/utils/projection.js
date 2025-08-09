@@ -1,23 +1,30 @@
 /**
- * Projects grid coordinates to screen coordinates
+ * Projects grid coordinates to screen coordinates with increased spacing
  * @param {number} x - X coordinate (0-100)
  * @param {number} y - Y coordinate (0-100)
  * @param {Object} dimensions - Container dimensions {width, height}
  * @returns {Object} Projected coordinates {x, y}
  */
 export const project = (x, y, dimensions) => {
-  // Add 10% margin
-  const margin = 0.1;
+  // Increase margin to 20% for better spacing and to prevent cutoff
+  const margin = 0.2;
   const marginX = dimensions.width * margin;
   const marginY = dimensions.height * margin;
   
-  // Scale from 0-100 to container dimensions with margins
-  const scaleX = (dimensions.width - 2 * marginX) / 100;
-  const scaleY = (dimensions.height - 2 * marginY) / 100;
+  // Apply a larger scaling factor to spread out points more
+  const scaleFactor = 1.5; // Larger factor = more space between points
+  
+  // Scale from 0-100 to container dimensions with margins and scaling
+  const scaleX = ((dimensions.width - 2 * marginX) / 100) * scaleFactor;
+  const scaleY = ((dimensions.height - 2 * marginY) / 100) * scaleFactor;
+  
+  // Center the points in the container
+  const offsetX = (dimensions.width - (100 * scaleX)) / 2;
+  const offsetY = (dimensions.height - (100 * scaleY)) / 2;
   
   return {
-    x: x * scaleX + marginX,
-    y: y * scaleY + marginY
+    x: x * scaleX + offsetX,
+    y: y * scaleY + offsetY
   };
 };
 
