@@ -725,8 +725,8 @@ const Grid = () => {
               onEdgeDelayChange={handleEdgeDelayChange}
             />
             
-            {/* Plane Animation - Always shown when there's a valid path */}
-            {shortestPath.length > 1 && (
+            {/* Plane Animation - Only show when there's a valid path and not in visualization mode */}
+            {shortestPath.length > 1 && !showVisualization && (
               <div 
                 key={`plane-animation-${shortestPath.join('-')}`}
                 style={{

@@ -1,96 +1,130 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FaPlane } from 'react-icons/fa';
 import styled, { keyframes } from 'styled-components';
 
-// Colors for visualization
-const COLORS = {
+// Simplified colors for better visibility
+const colors = {
   start: '#10B981',    // Green
   end: '#EF4444',      // Red
-  unvisited: 'rgba(59, 130, 246, 0.8)',
-  visited: 'rgba(245, 158, 11, 0.8)',
-  visiting: '#8B5CF6',  // Purple
-  path: '#10B981',     // Green
-  line: 'rgba(99, 102, 241, 0.4)',
-  text: '#1F2937',
-  background: '#F9FAFB',
+  current: '#F59E0B',  // Amber
+  visited: '#3B82F6',  // Blue
+  path: '#8B5CF6',     // Purple
+  default: '#6B7280',  // Gray
+  line: '#4B5563',     // Dark gray lines
+  text: '#E5E7EB'      // Light text
 };
-
-// Animation keyframes
-const pulse = keyframes`
-  0% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.1); opacity: 0.8; }
-  100% { transform: scale(1); opacity: 1; }
-`;
 
 // Styled components
 const Container = styled.div`
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  background: ${COLORS.background};
-  border-radius: 8px;
-  overflow: hidden;
+  background: transparent;
+  pointer-events: none;
 `;
 
 const Svg = styled.svg`
   width: 100%;
   height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
+  background-color: ${colors.background};
+  border-radius: 8px;
+  overflow: visible;
+  
+  /* Gradient definitions */
+  .gradient-defs {
+    position: absolute;
+    height: 0;
+    width: 0;
+  }
 `;
 
-const Node = styled.circle`
-  cursor: pointer;
+// Airplane icon node
+const AirplaneIcon = styled(FaPlane)`
+  width: 100%;
+  height: 100%;
+  color: ${props => {
+    if (props.className?.includes('start')) return '#10B981'; // Green for start
+    if (props.className?.includes('end')) return '#EF4444';   // Red for end
+    if (props.className?.includes('path')) return '#8B5CF6';  // Purple for path
+    if (props.className?.includes('visiting')) return '#F59E0B'; // Amber for visiting
+    if (props.className?.includes('visited')) return '#3B82F6'; // Blue for visited
+    return '#6B7280'; // Gray for unvisited
+  }};
   transition: all 0.3s ease;
-  stroke: white;
-  stroke-width: 2;
+  transform: rotate(45deg);
+  opacity: ${props => props.className?.includes('unvisited') ? '0.3' : '0.8'};
   
-  &.start {
-    fill: ${COLORS.start};
-    animation: ${pulse} 1.5s infinite;
-  }
-  
-  &.end {
-    fill: ${COLORS.end};
-    animation: ${pulse} 1.5s infinite 0.5s;
-  }
-  
-  &.unvisited {
-    fill: ${COLORS.unvisited};
-  }
-  
-  &.visited {
-    fill: ${COLORS.visited};
-  }
-  
-  &.visiting {
-    fill: ${COLORS.visiting};
-    filter: drop-shadow(0 0 4px ${COLORS.visiting});
-  }
-  
-  &.path {
-    fill: ${COLORS.path};
-    animation: ${pulse} 1s infinite;
+  &:hover {
+    transform: rotate(45deg) scale(1.2);
+    opacity: 1;
   }
 `;
 
-const Line = styled.line`
-  stroke: ${props => props.isPath ? COLORS.path : COLORS.line};
-  stroke-width: ${props => props.isPath ? 2 : 1};
+const Line = styled(motion.line)`
+  stroke: ${props => props.isPath ? colors.path : colors.line};
+  stroke-width: ${props => props.isPath ? 0.6 : 0.3};
   stroke-linecap: round;
-  transition: all 0.3s ease;
-  opacity: ${props => props.isPath ? 1 : 0.7};
+  opacity: ${props => props.isPath ? 0.7 : 0.15};
+  pointer-events: none;
 `;
 
 const NodeLabel = styled.text`
-  font-size: 10px;
-  font-weight: bold;
+  fill: white;
+  font-size: 2.5px;
   text-anchor: middle;
   dominant-baseline: middle;
   pointer-events: none;
-  fill: white;
   user-select: none;
+  font-weight: bold;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
 `;
+
+// Animation variants for nodes and edges
+const nodeVariants = {
+  hidden: { scale: 0, opacity: 0 },
+  visible: (custom) => ({
+    scale: [1, 1.4, 1],
+    opacity: 1,
+    transition: {
+      delay: custom * 0.2,
+      duration: 0.8,
+      ease: [0.22, 1, 0.36, 1]
+    },
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    boxShadow: '0 0 10px 3px rgba(255, 255, 255, 0.8)'
+  })
+};
+
+
+
+const edgeVariants = {
+  hidden: { pathLength: 0, opacity: 0 },
+  visible: (custom) => ({
+    pathLength: 1,
+    opacity: 0.7,
+    transition: {
+      delay: custom * 0.2 + 0.3,
+      duration: 0.8,
+      ease: 'easeInOut'
+    }
+  })
+};
+
+const pathVariants = {
+  hidden: { pathLength: 0, opacity: 0 },
+  visible: (custom) => ({
+    pathLength: 1,
+    opacity: 1,
+    transition: {
+      delay: custom * 0.1 + 0.3,
+      duration: 0.8,
+      ease: 'easeInOut'
+    }
+  })
+};
 
 const SimpleAStarVisualization = ({
   startPoint = null,
@@ -110,78 +144,119 @@ const SimpleAStarVisualization = ({
   const [animationSteps, setAnimationSteps] = useState([]);
   const [currentStep, setCurrentStep] = useState(0);
 
-  // Generate random nodes
+  // Main airports data with relative positions (0-100 range)
+  const mainAirports = useMemo(() => [
+    { id: 'jfk', name: 'JFK', x: 80, y: 25 },
+    { id: 'lax', name: 'LAX', x: 15, y: 40 },
+    { id: 'ord', name: 'ORD', x: 45, y: 30 },
+    { id: 'dfw', name: 'DFW', x: 35, y: 55 },
+    { id: 'den', name: 'DEN', x: 30, y: 35 },
+    { id: 'sfo', name: 'SFO', x: 10, y: 30 },
+    { id: 'sea', name: 'SEA', x: 15, y: 15 },
+    { id: 'atl', name: 'ATL', x: 60, y: 60 },
+    { id: 'mco', name: 'MCO', x: 70, y: 75 },
+    { id: 'las', name: 'LAS', x: 20, y: 45 }
+  ]);
+
+  // Generate nodes from main airports
   const generateNodes = useCallback(() => {
-    if (!dimensions.width || !dimensions.height) return [];
+    if (!startPoint || !endPoint) return [];
 
     const newNodes = [];
-    const padding = 5;
-    const minDistance = 10;
     
     // Add start and end points
-    if (startPoint && endPoint) {
-      newNodes.push({
-        id: 'start',
-        x: startPoint.x,
-        y: startPoint.y,
-        type: 'start',
-        gScore: 0,
-        fScore: 0,
-        cameFrom: null,
-      });
+    newNodes.push({
+      id: 'start',
+      x: startPoint.x,
+      y: startPoint.y,
+      type: 'start',
+      gScore: 0,
+      fScore: 0,
+      cameFrom: null,
+    });
 
+    // Add main airports
+    mainAirports.forEach((airport) => {
       newNodes.push({
-        id: 'end',
-        x: endPoint.x,
-        y: endPoint.y,
-        type: 'end',
+        id: airport.id,
+        name: airport.name,
+        x: airport.x,
+        y: airport.y,
+        type: 'airport',
         gScore: Infinity,
         fScore: Infinity,
         cameFrom: null,
       });
-    }
-
-    // Generate random nodes
-    for (let i = 0; i < nodeCount; i++) {
-      let x, y, isValid;
-      let attempts = 0;
-      const maxAttempts = 100;
-      
-      // Ensure nodes are not too close to each other
-      do {
-        isValid = true;
-        x = padding + Math.random() * (100 - 2 * padding);
-        y = padding + Math.random() * (100 - 2 * padding);
-        
-        for (const node of newNodes) {
-          const distance = Math.sqrt(
-            Math.pow(node.x - x, 2) + Math.pow(node.y - y, 2)
-          );
-          
-          if (distance < minDistance) {
-            isValid = false;
-            break;
-          }
-        }
-        
-        attempts++;
-      } while (!isValid && attempts < maxAttempts);
-      
-      if (isValid) {
-        newNodes.push({
-          id: `node-${i}`,
-          x,
-          y,
-          type: 'unvisited',
-          gScore: Infinity,
-          fScore: Infinity,
-          cameFrom: null,
-        });
-      }
-    }
+    });
+    
+    // Add end point
+    newNodes.push({
+      id: 'end',
+      x: endPoint.x,
+      y: endPoint.y,
+      type: 'end',
+      gScore: Infinity,
+      fScore: Infinity,
+      cameFrom: null,
+    });
     
     return newNodes;
-  }, [dimensions, nodeCount, startPoint, endPoint]);
+  }, [startPoint, endPoint, mainAirports]);
+  
+  // Initialize nodes when component mounts or when start/end points change
+  useEffect(() => {
+    if (startPoint && endPoint) {
+      const newNodes = generateNodes();
+      setNodes(newNodes);
+      
+      // Generate lines between nodes
+      const newLines = [];
+      const maxDistance = 30; // Maximum distance to connect nodes
+      
+      // Connect each node to its nearest neighbors
+      newNodes.forEach((node1) => {
+        // Find closest nodes within maxDistance
+        const nearbyNodes = newNodes
+          .filter(n => n.id !== node1.id)
+          .map(node2 => ({
+            ...node2,
+            distance: Math.sqrt(
+              Math.pow(node1.x - node2.x, 2) + 
+              Math.pow(node1.y - node2.y, 2)
+            )
+          }))
+          .filter(n => n.distance <= maxDistance)
+          .sort((a, b) => a.distance - b.distance)
+          .slice(0, 3); // Connect to up to 3 nearest nodes
+        
+        // Create lines to nearby nodes
+        nearbyNodes.forEach(node2 => {
+          // Check if line already exists
+          const lineExists = newLines.some(
+            line => 
+              (line.x1 === node1.x && line.y1 === node1.y && 
+               line.x2 === node2.x && line.y2 === node2.y) ||
+              (line.x1 === node2.x && line.y1 === node2.y && 
+               line.x2 === node1.x && line.y2 === node1.y)
+          );
+          
+          if (!lineExists) {
+            newLines.push({
+              id: `line-${node1.id}-${node2.id}`,
+              x1: node1.x,
+              y1: node1.y,
+              x2: node2.x,
+              y2: node2.y,
+              distance: Math.round(node2.distance * 10) / 10,
+              isPath: false
+            });
+          }
+        });
+      });
+      
+      setLines(newLines);
+    }
+  }, [startPoint, endPoint, generateNodes]);
 
   // Generate lines between nodes
   const generateLines = useCallback((nodes) => {
@@ -240,6 +315,25 @@ const SimpleAStarVisualization = ({
       Math.pow(node1.y - node2.y, 2)
     );
   }, []);
+
+  // Calculate heuristic values for all nodes to display
+  const nodeHeuristics = useMemo(() => {
+    if (!nodes.length) return {};
+    
+    const endNode = nodes.find(n => n.id === 'end');
+    if (!endNode) return {};
+    
+    const heuristics = {};
+    nodes.forEach(node => {
+      const h = heuristic(node, endNode);
+      // Store both the raw value and formatted string for all nodes
+      heuristics[node.id] = {
+        value: h,
+        formatted: h.toFixed(1)
+      };
+    });
+    return heuristics;
+  }, [nodes, heuristic]);
 
   // A* algorithm implementation
   const runAStar = useCallback((nodes, lines) => {
@@ -349,70 +443,122 @@ const SimpleAStarVisualization = ({
     return steps;
   }, [heuristic]);
   
+  // Process animation steps one by one
+  const processAnimationStep = useCallback((steps, index) => {
+    if (index >= steps.length) {
+      setIsRunning(false);
+      onComplete();
+      return;
+    }
+    
+    const step = steps[index];
+    setCurrentStep(index);
+    
+    switch (step.type) {
+      case 'visit':
+        setVisitedNodes(prev => {
+          const newVisited = new Set(prev);
+          newVisited.add(step.nodeId);
+          return newVisited;
+        });
+        setCurrentNode(step.nodeId);
+        break;
+        
+      case 'path':
+        setPath(prev => [...prev, step.from, step.to]);
+        break;
+        
+      case 'complete':
+        setPath(step.path);
+        setCurrentNode(null);
+        break;
+    }
+    
+    // Schedule next step with appropriate delay
+    let delay = speed;
+    if (step.type === 'visit') delay = speed * 1.5;
+    else if (step.type === 'path') delay = speed * 2;
+    else if (step.type === 'complete') delay = speed * 3;
+    
+    const timer = setTimeout(() => {
+      processAnimationStep(steps, index + 1);
+    }, delay);
+    
+    return () => clearTimeout(timer);
+  }, [speed, onComplete]);
+  
   // Animate the A* algorithm steps
   const animateSteps = useCallback((steps) => {
     if (!steps.length) return;
     
-    let stepIndex = 0;
-    const visited = new Set();
-    const pathLines = new Set();
-    
-    const processStep = () => {
-      if (stepIndex >= steps.length) {
-        setIsRunning(false);
-        onComplete();
-        return;
-      }
-      
-      const step = steps[stepIndex];
-      
-      switch (step.type) {
-        case 'visit':
-          visited.add(step.nodeId);
-          setVisitedNodes(new Set(visited));
-          setCurrentNode(step.nodeId);
-          break;
-          
-        case 'path':
-          pathLines.add(`${step.from}-${step.to}`);
-          setPath(Array.from(pathLines));
-          break;
-          
-        case 'complete':
-          setPath(step.path);
-          setCurrentNode(null);
-          break;
-      }
-      
-      stepIndex++;
-      setTimeout(processStep, speed);
-    };
-    
     setIsRunning(true);
-    processStep();
-  }, [speed, onComplete]);
+    setVisitedNodes(new Set());
+    setPath([]);
+    setCurrentNode(null);
+    
+    // Start processing steps
+    processAnimationStep(steps, 0);
+  }, [processAnimationStep]);
   
-  // Initialize nodes and lines
+  // Initialize nodes and lines and run A* algorithm
   useEffect(() => {
+    if (!startPoint || !endPoint) return;
+    
     const newNodes = generateNodes();
     const newLines = generateLines(newNodes);
     setNodes(newNodes);
     setLines(newLines);
     
-    // Run A* after a short delay to allow rendering
+    // Run A* algorithm and start animation
     const timer = setTimeout(() => {
       const steps = runAStar(newNodes, newLines);
-      setAnimationSteps(steps);
-    }, 100);
+      if (steps.length > 0) {
+        setAnimationSteps(steps);
+        setCurrentStep(0);
+        
+        // Start animation
+        const interval = setInterval(() => {
+          setCurrentStep(prev => {
+            if (prev >= steps.length - 1) {
+              clearInterval(interval);
+              setIsRunning(false);
+              return prev;
+            }
+            return prev + 1;
+          });
+        }, speed);
+        
+        return () => clearInterval(interval);
+      } else {
+        console.error('No steps generated by A* algorithm');
+      }
+    }, 500); // Short delay to ensure nodes are rendered
     
     return () => clearTimeout(timer);
-  }, [generateNodes, generateLines, runAStar]);
+  }, [startPoint, endPoint, generateNodes, generateLines, runAStar, speed]);
+  
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      // Clean up any pending timeouts or intervals
+      setCurrentNode(null);
+      setVisitedNodes(new Set());
+      setPath([]);
+      setAnimationSteps([]);
+      setCurrentStep(0);
+    };
+  }, []);
   
   // Start animation when steps are ready
   useEffect(() => {
     if (animationSteps.length > 0 && !isRunning) {
       animateSteps(animationSteps);
     }
+    
+    // Clean up on unmount
+    return () => {
+      setIsRunning(false);
+    };
   }, [animationSteps, animateSteps, isRunning]);
 
   // Check if a line is part of the path
@@ -435,19 +581,95 @@ const SimpleAStarVisualization = ({
     });
   }, [path, nodes]);
 
-  // Get node class based on its state
-  const getNodeClass = (node) => {
-    if (node.id === 'start') return 'start';
-    if (node.id === 'end') return 'end';
-    if (path.includes(node.id)) return 'path';
-    if (node.id === currentNode) return 'visiting';
-    if (visitedNodes.has(node.id)) return 'visited';
-    return 'unvisited';
+  // Get node class and style based on its state
+  const getNodeState = (node) => {
+    if (node.id === 'start') return { 
+      type: 'start', 
+      color: '#10B981', 
+      bgColor: 'rgba(16, 185, 129, 0.3)',
+      text: 'START',
+      size: 1.8,
+      textSize: '1.4px'
+    };
+    if (node.id === 'end') return { 
+      type: 'end', 
+      color: '#EF4444', 
+      bgColor: 'rgba(239, 68, 68, 0.3)',
+      text: 'END',
+      size: 1.8,
+      textSize: '1.4px'
+    };
+    if (path.includes(node.id)) return { 
+      type: 'path', 
+      color: '#8B5CF6', 
+      bgColor: 'rgba(139, 92, 246, 0.3)',
+      text: node.name || node.id.toUpperCase(),
+      size: 1.5,
+      textSize: '1.2px'
+    };
+    if (node.id === currentNode) return { 
+      type: 'current', 
+      color: '#F59E0B', 
+      bgColor: 'rgba(245, 158, 11, 0.3)',
+      text: node.name || node.id.toUpperCase(),
+      size: 1.7,
+      textSize: '1.3px'
+    };
+    if (visitedNodes.has(node.id)) return { 
+      type: 'visited', 
+      color: '#3B82F6', 
+      bgColor: 'rgba(59, 130, 246, 0.2)',
+      text: node.name || node.id.toUpperCase(),
+      size: 1.4,
+      textSize: '1.1px'
+    };
+    return { 
+      type: 'unvisited', 
+      color: '#6B7280', 
+      bgColor: 'rgba(107, 114, 128, 0.1)',
+      text: node.name || node.id.toUpperCase(),
+      size: 1.2,
+      textSize: '1px',
+      opacity: 0.7
+    };
   };
 
   return (
     <Container>
       <Svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        {/* Gradient definitions */}
+        <defs>
+          <linearGradient id="startGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#10B981" />
+            <stop offset="100%" stopColor="#059669" />
+          </linearGradient>
+          <linearGradient id="endGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#EF4444" />
+            <stop offset="100%" stopColor="#DC2626" />
+          </linearGradient>
+          <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#818CF8" />
+            <stop offset="100%" stopColor="#4F46E5" />
+          </linearGradient>
+          <linearGradient id="visitingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#F59E0B" />
+            <stop offset="100%" stopColor="#D97706" />
+          </linearGradient>
+          <linearGradient id="visitedGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#6B7280" />
+            <stop offset="100%" stopColor="#4B5563" />
+          </linearGradient>
+          <linearGradient id="unvisitedGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#1F2937" />
+            <stop offset="100%" stopColor="#111827" />
+          </linearGradient>
+          
+          {/* Glow effects */}
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
         {/* Render lines */}
         {lines.map((line, index) => (
           <Line
@@ -460,26 +682,92 @@ const SimpleAStarVisualization = ({
           />
         ))}
         
-        {/* Render nodes */}
-        {nodes.map(node => (
-          <g key={node.id}>
-            <Node
-              className={getNodeClass(node)}
-              cx={`${node.x}%`}
-              cy={`${node.y}%`}
-              r={node.id === 'start' || node.id === 'end' ? 4 : 3}
-            />
-            {node.id === 'start' || node.id === 'end' || node.id === currentNode ? (
-              <NodeLabel 
-                x={`${node.x}%`} 
-                y={`${parseFloat(node.y) + 1}%`}
-                style={{ fontSize: '4px' }}
+        {/* Render airport nodes */}
+        {nodes.map(node => {
+          const { type, color, bgColor, text, size, textSize, opacity = 1 } = getNodeState(node);
+          const isStartOrEnd = type === 'start' || type === 'end';
+          const isVisited = type === 'visited' || type === 'path' || isStartOrEnd;
+          const showHeuristic = isVisited && !isStartOrEnd;
+          const heuristicValue = nodeHeuristics[node.id]?.formatted || '';
+          const textYOffset = type === 'current' ? -2 : 0;
+          
+          return (
+            <g key={node.id}>
+              {/* Connection lines are rendered separately */}
+              
+              {/* Node outer circle */}
+              <circle
+                cx={`${node.x}%`}
+                cy={`${node.y}%`}
+                r={`${size}%`}
+                fill={bgColor}
+                stroke={color}
+                strokeWidth="0.2"
+                style={{
+                  filter: `drop-shadow(0 0 4px ${color}${isStartOrEnd ? '80' : '40'})`,
+                  transition: 'all 0.3s ease',
+                  opacity: opacity
+                }}
+              />
+              
+              {/* Node inner circle */}
+              <circle
+                cx={`${node.x}%`}
+                cy={`${node.y}%`}
+                r={`${size * 0.6}%`}
+                fill={color}
+                style={{
+                  filter: `drop-shadow(0 0 6px ${color}${isStartOrEnd ? 'FF' : '80'})`,
+                  transition: 'all 0.3s ease',
+                  opacity: opacity
+                }}
+              />
+              
+              {/* Airport code/text */}
+              <text
+                x={`${node.x}%`}
+                y={`${parseFloat(node.y) + textYOffset}%`}
+                textAnchor="middle"
+                style={{
+                  fontSize: textSize,
+                  fill: color,
+                  fontWeight: type === 'current' ? 'bold' : 'normal',
+                  pointerEvents: 'none',
+                  textShadow: '0 0 3px rgba(0,0,0,0.8)',
+                  fontFamily: 'Arial, sans-serif',
+                  opacity: opacity,
+                  transition: 'all 0.3s ease',
+                  userSelect: 'none',
+                  letterSpacing: '0.5px'
+                }}
               >
-                {node.id === 'start' ? 'Start' : node.id === 'end' ? 'End' : 'Current'}
-              </NodeLabel>
-            ) : null}
-          </g>
-        ))}
+                {text}
+              </text>
+              
+              {/* Heuristic value */}
+              {showHeuristic && (
+                <text
+                  x={`${node.x}%`}
+                  y={`${parseFloat(node.y) + 1.8}%`}
+                  textAnchor="middle"
+                  style={{
+                    fontSize: '1.1px',
+                    fill: type === 'path' ? '#8B5CF6' : '#A5B4FC',
+                    pointerEvents: 'none',
+                    textShadow: '0 0 2px #000',
+                    fontWeight: '500',
+                    userSelect: 'none',
+                    fontFamily: 'monospace',
+                    opacity: opacity * 0.9,
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {heuristicValue}
+                </text>
+              )}
+            </g>
+          );
+        })}
       </Svg>
     </Container>
   );

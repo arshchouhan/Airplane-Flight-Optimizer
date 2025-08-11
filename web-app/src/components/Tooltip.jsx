@@ -23,33 +23,51 @@ const Tooltip = ({ visible, x, y, airport }) => {
       }}
     >
       <div className="tooltip-header">
-        <h4 className="tooltip-title">{airport.name}</h4>
-        <span className="tooltip-code">{airport.id}</span>
+        <h4 className="tooltip-title">{airport.name || 'Unknown Airport'}</h4>
+        {airport.id && <span className="tooltip-code">Code: {airport.id}</span>}
       </div>
       
       <div className="tooltip-body">
-        {airport.city && (
+        {airport.city || airport.country ? (
           <div className="tooltip-row">
             <span className="tooltip-label">Location:</span>
             <span className="tooltip-value">
-              {airport.city}
-              {airport.country && `, ${airport.country}`}
+              {[airport.city, airport.country].filter(Boolean).join(', ')}
             </span>
           </div>
-        )}
+        ) : null}
         
         <div className="tooltip-row">
           <span className="tooltip-label">Coordinates:</span>
           <span className="tooltip-value">
-            {airport.position?.lat?.toFixed(4) || 'N/A'}, 
-            {airport.position?.lon?.toFixed(4) || 'N/A'}
+            {airport.position?.lat && airport.position?.lon 
+              ? `${airport.position.lat.toFixed(4)}°, ${airport.position.lon.toFixed(4)}°`
+              : 'Coordinates not available'}
           </span>
         </div>
         
         {airport.routes && (
           <div className="tooltip-row">
-            <span className="tooltip-label">Connections:</span>
-            <span className="tooltip-value">{airport.routes.length}</span>
+            <span className="tooltip-label">Direct Connections:</span>
+            <span className="tooltip-value">
+              {airport.routes.length} {airport.routes.length === 1 ? 'route' : 'routes'}
+            </span>
+          </div>
+        )}
+        
+        {airport.runways && airport.runways > 0 && (
+          <div className="tooltip-row">
+            <span className="tooltip-label">Runways:</span>
+            <span className="tooltip-value">{airport.runways}</span>
+          </div>
+        )}
+        
+        {airport.elevation !== undefined && (
+          <div className="tooltip-row">
+            <span className="tooltip-label">Elevation:</span>
+            <span className="tooltip-value">
+              {airport.elevation.toLocaleString()} ft
+            </span>
           </div>
         )}
       </div>

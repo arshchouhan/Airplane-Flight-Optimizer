@@ -4,6 +4,7 @@
   border-radius: 8px;
   margin-bottom: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 100%;
 }
 
 .algorithm-selector h3 {
@@ -56,19 +57,6 @@
   height: 16px;
 }
 
-.selection-hint {
-  margin: 8px 0 0 0;
-  font-size: 13px;
-  color: #6c757d;
-  font-style: italic;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 .algorithm-option span {
   font-size: 14px;
   color: #495057;
@@ -78,4 +66,51 @@
 .algorithm-option input[type="radio"]:checked + span {
   font-weight: 500;
   color: #1971c2;
+}
+
+.instructions {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+  text-align: left;
+  border-left: 4px solid #4CAF50;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.instructions p {
+  margin: 0 0 10px 0;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.instructions ol {
+  margin: 0 0 10px 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.instructions li {
+  margin-bottom: 6px;
+  color: #495057;
+}
+
+.instructions .note {
+  font-size: 13px;
+  color: #6c757d;
+  font-style: italic;
+  margin: 10px 0 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed #dee2e6;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
