@@ -12,7 +12,7 @@
 
 /* Left Panel */
 .left-panel {
-  width: 250px;
+  width: 300px;
   height: 100%;
   background-color: #0f172a;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
@@ -172,11 +172,36 @@
   flex-direction: column;
 }
 
+/* Settings panel overlay - Only covers the left panel area */
+.settings-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 300px; /* Match left-panel width */
+  height: 100%;
+  z-index: 1001; /* Above the left panel but below the settings panel */
+  background-color: transparent;
+  cursor: pointer;
+  pointer-events: none; /* Allow clicks to pass through when not needed */
+}
+
+/* Star Grid Overlay */
+.star-grid-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1; /* Below the main content but above the background */
+  pointer-events: none; /* Allow clicks to pass through to elements below */
+}
+
 .grid-container {
   position: relative;
   width: 100%;
   flex: 1;
   overflow: hidden;
+  background: transparent; /* Make sure the container is transparent for the star grid */
 }
 
 /* Loading overlay */

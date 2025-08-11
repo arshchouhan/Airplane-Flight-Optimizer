@@ -1,0 +1,81 @@
+.algorithm-selector {
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.algorithm-selector h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.required {
+  color: #dc3545;
+  font-weight: bold;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.algorithm-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.algorithm-option {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.algorithm-option:hover {
+  background-color: #e9ecef;
+}
+
+.algorithm-option.unselected {
+  border: 1px solid #ffc107;
+  background-color: #fff8e1;
+}
+
+.algorithm-option input[type="radio"] {
+  margin-right: 10px;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.selection-hint {
+  margin: 8px 0 0 0;
+  font-size: 13px;
+  color: #6c757d;
+  font-style: italic;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.algorithm-option span {
+  font-size: 14px;
+  color: #495057;
+  user-select: none;
+}
+
+.algorithm-option input[type="radio"]:checked + span {
+  font-weight: 500;
+  color: #1971c2;
+}

@@ -1,6 +1,6 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { FaPlane, FaPlaneArrival, FaPlaneDeparture } from 'react-icons/fa';
+import { FaPlane, FaPlaneArrival, FaPlaneDeparture, FaInfoCircle } from 'react-icons/fa';
 import { normalizeCoordinates } from '../utils/projection';
 import EdgeDetailsModal from './EdgeDetailsModal';
 import '../styles/GraphCanvas.css';
@@ -24,9 +24,11 @@ const GraphCanvas = ({
   onAirportClick = () => {},
   onAirportRightClick = () => {},
   highlightedPath = [],
+  selectedAirports = [],
   disabledAirports = new Set(),
   edgeDelays = {},
-  onEdgeDelayChange = () => {}
+  onEdgeDelayChange = () => {},
+  visualizationMode = 'plane' // 'plane' or 'algorithm'
 }) => {
   // Normalize airport coordinates to fit the container
   const normalizedAirports = useMemo(() => {
@@ -41,8 +43,33 @@ const GraphCanvas = ({
     );
   }, [airports, dimensions]);
 
-  // State for selected edge
+  // State for selected edge and hovered airport
   const [selectedEdge, setSelectedEdge] = useState(null);
+  const [hoveredAirport, setHoveredAirport] = useState(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const tooltipRef = useRef(null);
+  
+  // Update tooltip position based on mouse movement
+  const handleMouseMove = useCallback((e) => {
+    if (hoveredAirport) {
+      setTooltipPosition({
+        x: e.clientX + 10,
+        y: e.clientY + 10
+      });
+    }
+  }, [hoveredAirport]);
+  
+  // Add/remove mousemove event listener
+  useEffect(() => {
+    if (hoveredAirport) {
+      window.addEventListener('mousemove', handleMouseMove);
+    } else {
+      window.removeEventListener('mousemove', handleMouseMove);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [hoveredAirport, handleMouseMove]);
 
   // Handle edge click
   const handleEdgeClick = useCallback((e, route) => {
@@ -81,16 +108,21 @@ const GraphCanvas = ({
 
   // Memoize route paths
   const routePaths = useMemo(() => {
-    if (!normalizedAirports.length || !routes.length) return [];
+    if (!normalizedAirports.length || !routes || !routes.length) return [];
     
     // Create a map for quick lookup
     const airportMap = new Map(normalizedAirports.map(ap => [ap.id, ap]));
     
     return routes
       .filter(route => {
+        if (!route || !route.source || !route.target) return false;
         const source = airportMap.get(route.source);
         const target = airportMap.get(route.target);
-        return source && target && source.x && source.y && target.x && target.y;
+        return source && target && 
+               typeof source.x === 'number' && 
+               typeof source.y === 'number' &&
+               typeof target.x === 'number' &&
+               typeof target.y === 'number';
       })
       .map(route => {
         const source = airportMap.get(route.source);
@@ -140,14 +172,24 @@ const GraphCanvas = ({
     );
   }, [normalizedAirports, isInViewport]);
 
-  // Handle mouse events
+  // Handle airport hover
+  const handleAirportHover = useCallback((airport) => {
+    onAirportHover(airport);
+    setHoveredAirport(airport);
+  }, [onAirportHover]);
+  
+  // Handle mouse leave from airport
+  const handleAirportLeave = useCallback(() => {
+    setHoveredAirport(null);
+  }, []);
+
   const handleAirportMouseEnter = (e, airport) => {
     onAirportHover(e, airport);
   };
 
   const handleAirportClick = (e, airport) => {
     e.stopPropagation();
-    onAirportClick(airport);
+    onAirportClick(e, airport);
   };
 
   const handleAirportContextMenu = (e, airport) => {
@@ -160,7 +202,45 @@ const GraphCanvas = ({
   }
 
   return (
-    <div className="graph-canvas">
+    <div className="graph-canvas" onMouseLeave={handleAirportLeave}>
+      {/* Airport Tooltip */}
+      {hoveredAirport && (
+        <div 
+          ref={tooltipRef}
+          className="airport-tooltip"
+          style={{
+            position: 'fixed',
+            left: `${tooltipPosition.x}px`,
+            top: `${tooltipPosition.y}px`,
+            zIndex: 1000,
+            pointerEvents: 'none',
+            transform: 'translateY(-100%)',
+            transition: 'opacity 0.2s, transform 0.1s',
+            opacity: hoveredAirport ? 1 : 0
+          }}
+        >
+          <div className="tooltip-content">
+            <h4>{hoveredAirport.name || 'Unknown Airport'}</h4>
+            <div className="tooltip-details">
+              <div className="code-badges">
+                <span className="code-badge iata">
+                  <strong>IATA</strong>
+                  <span className="code-value">{hoveredAirport.iata || 'N/A'}</span>
+                </span>
+                <span className="code-badge icao">
+                  <strong>ICAO</strong>
+                  <span className="code-value">{hoveredAirport.icao || 'N/A'}</span>
+                </span>
+              </div>
+              {hoveredAirport.city && <div><strong>City:</strong> {hoveredAirport.city}</div>}
+              {hoveredAirport.country && <div><strong>Country:</strong> {hoveredAirport.country}</div>}
+              {hoveredAirport.elevation !== undefined && (
+                <div><strong>Elevation:</strong> {hoveredAirport.elevation} ft</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {selectedEdge && (
         <EdgeDetailsModal
           edge={selectedEdge}
@@ -195,7 +275,7 @@ const GraphCanvas = ({
             
             {/* Visual route line */}
             <line
-              className={`route ${route.isHighlighted ? 'highlighted' : ''} ${route.delayClass || ''}`}
+              className={`route ${route.isHighlighted ? 'highlighted' : ''} ${route.delayClass || ''} ${visualizationMode === 'algorithm' ? 'faded' : ''}`}
               x1={route.x1}
               y1={route.y1}
               x2={route.x2}
@@ -240,7 +320,7 @@ const GraphCanvas = ({
           return (
             <div
               key={airport.id}
-              className={`airport ${isHighlighted ? 'highlighted' : ''} ${isDisabled ? 'disabled' : ''}`}
+              className={`airport ${isHighlighted ? 'highlighted' : ''} ${isDisabled ? 'disabled' : ''} ${selectedAirports.some(a => a.id === airport.id) ? 'selected' : ''}`}
               style={{
                 left: `${airport.x}px`,
                 top: `${airport.y}px`,
@@ -251,9 +331,9 @@ const GraphCanvas = ({
                 opacity: isDisabled ? 0.5 : 1,
                 filter: isDisabled ? 'grayscale(100%)' : 'none',
               }}
-              onMouseEnter={(e) => !isDisabled && handleAirportMouseEnter(e, airport)}
-              onMouseLeave={() => onAirportHover(null)}
-              onClick={(e) => !isDisabled && handleAirportClick(e, airport)}
+              onMouseEnter={() => handleAirportHover(airport)}
+              onMouseLeave={handleAirportLeave}
+              onClick={(e) => handleAirportClick(e, airport)}
               onContextMenu={(e) => handleAirportContextMenu(e, airport)}
               title={`${airport.name}${isDisabled ? ' (Right-click to enable)' : ' (Right-click to disable)'}`}
             >
@@ -289,6 +369,10 @@ GraphCanvas.propTypes = {
   }),
   onAirportHover: PropTypes.func,
   onAirportClick: PropTypes.func,
+  selectedAirports: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    name: PropTypes.string
+  })),
   highlightedPath: PropTypes.arrayOf(PropTypes.string)
 };
 

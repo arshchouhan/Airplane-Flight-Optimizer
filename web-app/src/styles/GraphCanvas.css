@@ -60,6 +60,19 @@
   pointer-events: none; /* Prevent the visual line from blocking clicks */
 }
 
+/* Faded edges during algorithm visualization */
+.route.faded {
+  opacity: 0.3;
+  stroke: #4a5568;
+}
+
+/* Ensure highlighted path remains visible */
+.route.highlighted.faded {
+  opacity: 1;
+  stroke: #3b82f6;
+  stroke-width: 4;
+}
+
 /* Route distance label */
 .route-label {
   font-size: 11px;
@@ -183,11 +196,129 @@
   box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.5);
 }
 
+.airport.selected {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.5), 0 0 20px rgba(255, 215, 0, 0.5);
+  transform: scale(1.1);
+  z-index: 30;
+  animation: pulse-gold 2s infinite;
+}
+
+@keyframes pulse-gold {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 215, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+  }
+}
+
 .airport.disabled {
   background-color: #757575;
   border-color: #9E9E9E;
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+/* Airport Tooltip */
+.airport-tooltip {
+  position: fixed;
+  background-color: rgba(15, 23, 42, 0.95);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 12px;
+  color: #f8fafc;
+  font-size: 14px;
+  max-width: 280px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.airport-tooltip h4 {
+  margin: 0 0 8px 0;
+  color: #60a5fa;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.airport-tooltip h4 svg {
+  color: #60a5fa;
+  font-size: 14px;
+}
+
+.tooltip-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tooltip-details div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.4;
+  margin: 4px 0;
+}
+
+/* Code badges */
+.code-badges {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+
+.code-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  min-width: 60px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.code-badge iata {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+}
+
+.code-badge icao {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: white;
+}
+
+.code-badge strong {
+  font-size: 10px;
+  opacity: 0.9;
+  margin-bottom: 2px;
+  font-weight: 500;
+}
+
+.code-value {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.tooltip-details strong {
+  color: #94a3b8;
+  font-weight: 500;
+  min-width: 70px;
+  display: inline-block;
 }
 
 .airport-pulse {
