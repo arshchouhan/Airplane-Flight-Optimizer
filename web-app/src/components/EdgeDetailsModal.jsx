@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import './EdgeDetailsModal.css';
-import { FaCheck, FaTimes } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaPlane, FaChartLine } from 'react-icons/fa';
 
-const EdgeDetailsModal = ({ edge, onClose, onDelayChange }) => {
+const EdgeDetailsModal = ({ edge, onClose, onDelayChange, onFrequencyChange }) => {
   const [pendingDelay, setPendingDelay] = useState(edge?.delay || 0);
+  const [frequency, setFrequency] = useState(edge?.frequency || 1);
   const [isChanged, setIsChanged] = useState(false);
   
   // Update local state when edge prop changes
   useEffect(() => {
     setPendingDelay(edge?.delay || 0);
+    setFrequency(edge?.frequency || 1);
     setIsChanged(false);
   }, [edge]);
   
@@ -20,10 +22,36 @@ const EdgeDetailsModal = ({ edge, onClose, onDelayChange }) => {
     setPendingDelay(updatedDelay);
     setIsChanged(updatedDelay !== (edge.delay || 0));
   };
+
+  const handleFrequencyChange = (newFrequency) => {
+    // Ensure frequency is between 1 and 10
+    const updatedFrequency = Math.max(1, Math.min(10, Number(newFrequency)));
+    setFrequency(updatedFrequency);
+    setIsChanged(updatedFrequency !== (edge.frequency || 1));
+  };
+
+  const getFrequencyLabel = (freq) => {
+    if (freq <= 2) return 'Low';
+    if (freq <= 5) return 'Medium';
+    if (freq <= 8) return 'High';
+    return 'Very High';
+  };
+
+  const getFrequencyDescription = (freq) => {
+    if (freq <= 2) return 'Limited flights - book in advance';
+    if (freq <= 5) return 'Regular service - good availability';
+    if (freq <= 8) return 'Frequent flights - flexible options';
+    return 'Continuous service - maximum flexibility';
+  };
   
   const applyChanges = () => {
     if (onDelayChange && !isNaN(pendingDelay)) {
       onDelayChange(edge.id, pendingDelay);
+      
+      if (onFrequencyChange) {
+        onFrequencyChange(edge.id, frequency);
+      }
+      
       setIsChanged(false);
       // Close the modal after a short delay to show the edge update
       setTimeout(() => onClose(), 100);
@@ -32,6 +60,7 @@ const EdgeDetailsModal = ({ edge, onClose, onDelayChange }) => {
   
   const cancelChanges = () => {
     setPendingDelay(edge.delay || 0);
+    setFrequency(edge.frequency || 1);
     setIsChanged(false);
   };
 
@@ -108,6 +137,48 @@ const EdgeDetailsModal = ({ edge, onClose, onDelayChange }) => {
                 <span>Adjust delay to simulate traffic or weather conditions</span>
               )}
             </div>
+            
+            <div className="frequency-controls">
+              <div className="frequency-header">
+                <FaChartLine className="frequency-icon" />
+                <h4>Flight Frequency</h4>
+                <span className={`frequency-badge frequency-${getFrequencyLabel(frequency).toLowerCase()}`}>
+                  {getFrequencyLabel(frequency)} ({frequency}/{frequency === 1 ? 'day' : 'days'})
+                </span>
+              </div>
+              
+              <div className="frequency-slider">
+                <div className="frequency-labels">
+                  <span>1/day</span>
+                  <span>10/day</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  step="1"
+                  value={frequency}
+                  onChange={(e) => handleFrequencyChange(e.target.value)}
+                  className="frequency-range"
+                />
+                <div className="frequency-ticks">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((tick) => (
+                    <span 
+                      key={tick} 
+                      className={`tick ${tick <= frequency ? 'active' : ''}`}
+                      onClick={() => handleFrequencyChange(tick)}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              <div className="frequency-description">
+                <FaPlane className="description-icon" />
+                <span>{getFrequencyDescription(frequency)}</span>
+              </div>
+            </div>
+            
+
             
             {isChanged && (
               <div className="action-buttons">

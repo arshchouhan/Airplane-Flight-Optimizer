@@ -65,10 +65,29 @@ const AirplaneIcon = styled(FaPlane)`
 
 const Line = styled(motion.line)`
   stroke: ${props => props.isPath ? colors.path : colors.line};
-  stroke-width: ${props => props.isPath ? 0.6 : 0.3};
+  stroke-width: ${props => props.isPath ? 2 : 1};
   stroke-linecap: round;
-  opacity: ${props => props.isPath ? 0.7 : 0.15};
+  opacity: ${props => props.isPath ? 0.9 : 0.3};
   pointer-events: none;
+`;
+
+const EdgeLabel = styled.text`
+  font-size: 12px;
+  fill: white;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+  font-family: Arial, sans-serif;
+  font-weight: bold;
+  text-shadow: 
+    -1px -1px 0 #000,
+     0   -1px 0 #000,
+     1px -1px 0 #000,
+     1px  0   0 #000,
+     1px  1px 0 #000,
+     0    1px 0 #000,
+    -1px  1px 0 #000,
+    -1px  0   0 #000;
 `;
 
 const NodeLabel = styled.text`
@@ -670,17 +689,66 @@ const SimpleAStarVisualization = ({
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         </defs>
-        {/* Render lines */}
-        {lines.map((line, index) => (
-          <Line
-            key={`line-${index}`}
-            x1={`${line.x1}%`}
-            y1={`${line.y1}%`}
-            x2={`${line.x2}%`}
-            y2={`${line.y2}%`}
-            isPath={isLineInPath(line)}
-          />
-        ))}
+        {/* Render lines with labels */}
+        {lines.map((line, index) => {
+          // Calculate the actual distance in kilometers (scaling the visual distance)
+          const visualDistance = Math.sqrt(
+            Math.pow(line.x2 - line.x1, 2) + 
+            Math.pow(line.y2 - line.y1, 2)
+          );
+          // Scale the visual distance to get reasonable km values (adjust scale factor as needed)
+          const scaleFactor = 20;
+          const distanceKm = Math.round(visualDistance * scaleFactor);
+          
+          const midX = (line.x1 + line.x2) / 2;
+          const midY = (line.y1 + line.y2) / 2;
+          const angle = Math.atan2(line.y2 - line.y1, line.x2 - line.x1) * (180 / Math.PI);
+          const isPath = isLineInPath(line);
+          
+          // Calculate flight time assuming average speed of 800 km/h
+          const timeHours = (distanceKm / 800).toFixed(1);
+          const labelText = `${distanceKm} km • ${timeHours}h`;
+          
+          // Adjust font size based on line length
+          const fontSize = Math.min(3, Math.max(1, visualDistance * 0.3));
+          
+          return (
+            <React.Fragment key={`line-${index}`}>
+              <Line
+                x1={`${line.x1}%`}
+                y1={`${line.y1}%`}
+                x2={`${line.x2}%`}
+                y2={`${line.y2}%`}
+                isPath={isPath}
+              />
+              <text
+                x={`${midX}%`}
+                y={`${midY}%`}
+                style={{
+                  fontSize: `${fontSize}px`,
+                  fill: isPath ? '#fff' : '#ccc',
+                  textAnchor: 'middle',
+                  dominantBaseline: 'middle',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  fontWeight: 'bold',
+                  fontFamily: 'Arial, sans-serif',
+                  textShadow: '0 0 3px rgba(0,0,0,0.8)',
+                  transform: `rotate(${angle}deg)`,
+                  transformOrigin: `${midX}% ${midY}%`,
+                  opacity: isPath ? 1 : 0.7,
+                  paintOrder: 'stroke',
+                  stroke: 'rgba(0,0,0,0.8)',
+                  strokeWidth: '0.5px',
+                  strokeLinecap: 'round',
+                  strokeLinejoin: 'round'
+                }}
+              >
+                {labelText}
+              </text>
+            </React.Fragment>
+          );
+        })}
         
         {/* Render airport nodes */}
         {nodes.map(node => {

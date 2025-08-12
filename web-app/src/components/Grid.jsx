@@ -28,6 +28,7 @@ const Grid = () => {
   const [shortestPath, setShortestPath] = useState([]);
   const [disabledAirports, setDisabledAirports] = useState(new Set());
   const [edgeDelays, setEdgeDelays] = useState({});
+  const [edgeFrequencies, setEdgeFrequencies] = useState({});
   const [selectedAlgorithm, setSelectedAlgorithm] = useState(null);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [isPathfinding, setIsPathfinding] = useState(false);
@@ -42,7 +43,7 @@ const Grid = () => {
   
   const containerRef = useRef(null);
   
-  // Create a function to get the effective weight of an edge (distance + delay)
+  // Create a function to get the effective weight of an edge that prioritizes higher frequency routes
   const getEdgeWeight = useCallback((source, target) => {
     // Find the route between source and target
     const route = routes.find(r => 
@@ -55,9 +56,20 @@ const Grid = () => {
     // Get the delay for this edge, default to 0
     const delay = edgeDelays[`${source}-${target}`] || edgeDelays[`${target}-${source}`] || 0;
     
-    // Return the distance plus delay
-    return (route.distance || 0) + delay;
-  }, [routes, edgeDelays]);
+    // Get the frequency for this edge, default to 1 (lowest frequency)
+    const frequency = edgeFrequencies[`${source}-${target}`] || edgeFrequencies[`${target}-${source}`] || 1;
+    
+    // Calculate frequency impact - using an exponential scale to strongly prefer higher frequencies
+    // This makes higher frequencies (like 6) MUCH more favorable than lower ones
+    const frequencyImpact = Math.pow(frequency, 2); // Square the frequency for stronger impact
+    
+    // Base weight is just the distance, with minimal delay impact
+    const baseWeight = (route.distance || 0) + (delay * 0.05);
+    
+    // Apply frequency impact - higher frequency routes get dramatically lower weights
+    // The division by 10 ensures the frequency impact is strong but doesn't completely override distance
+    return baseWeight / (frequencyImpact * 0.1 + 1);
+  }, [routes, edgeDelays, edgeFrequencies]);
   
   // Initialize graph with current airports and routes
   const graph = useMemo(() => {
@@ -213,12 +225,19 @@ const Grid = () => {
   const findPath = useCallback(async () => {
     // Reset visualization states first
     setShowVisualization(false);
+    setShowAStarVisualization(false);
     
-    if (selectedAirports.length !== 2) {
+    if (!selectedAirports || selectedAirports.length !== 2) {
       console.log('Not enough airports selected, clearing path');
       setShortestPath([]);
       return;
     }
+    
+    const [startAirport, endAirport] = selectedAirports;
+    const startNode = String(startAirport.id);
+    const endNode = String(endAirport.id);
+    
+    console.log('Finding path from', startNode, 'to', endNode);
     
     // Don't proceed if no algorithm is selected
     if (!selectedAlgorithm) {
@@ -232,8 +251,7 @@ const Grid = () => {
     setIsPathfinding(true);
     
     // Skip if either selected airport is disabled
-    if (disabledAirports.has(selectedAirports[0]?.id) || 
-        disabledAirports.has(selectedAirports[1]?.id)) {
+    if (disabledAirports.has(startNode) || disabledAirports.has(endNode)) {
       console.log('One or both selected airports are disabled');
       setShortestPath([]);
       setShowAStarVisualization(false);
@@ -242,15 +260,19 @@ const Grid = () => {
       return;
     }
     
+    // Log graph state for debugging
+    console.log('Graph nodes:', Array.from(graph.adjList.keys()));
+    console.log('Graph edges:');
+    for (const [node, edges] of graph.adjList.entries()) {
+      console.log(`  ${node} ->`, edges.map(e => `${e.node} (${e.weight})`).join(', '));
+    }
+    
     // Record start time and memory for metrics
     const startTime = performance.now();
     const startMemory = window.performance?.memory?.usedJSHeapSize || 0;
     
     try {
-      const startNode = String(selectedAirports[0].id);
-      const endNode = String(selectedAirports[1].id);
-      
-      // Use the memoized graph
+      console.log(`Finding path using ${selectedAlgorithm} algorithm...`);
       
       // Find path using the selected algorithm
       let result;
@@ -259,16 +281,20 @@ const Grid = () => {
         const nodePositions = {};
         airports.forEach(airport => {
           nodePositions[String(airport.id)] = {
-            x: airport.longitude,
-            y: airport.latitude
+            x: airport.longitude || 0,
+            y: airport.latitude || 0
           };
         });
         
+        console.log('Using A* with node positions:', nodePositions);
         result = findPathAStar(graph, startNode, endNode, nodePositions);
       } else {
         // For Dijkstra
+        console.log('Using Dijkstra algorithm');
         result = findDijkstraPath(graph, startNode, endNode);
       }
+      
+      console.log('Pathfinding result:', result);
       
       // Calculate metrics
       const endTime = performance.now();
@@ -424,6 +450,19 @@ const Grid = () => {
       setShortestPath([]);
     }
   }, [shortestPath]);
+  
+  // Handle edge frequency change from GraphCanvas
+  const handleEdgeFrequencyChange = useCallback((edgeId, frequency) => {
+    setEdgeFrequencies(prev => ({
+      ...prev,
+      [edgeId]: frequency
+    }));
+    
+    // Clear the current path since frequencies have changed
+    if (shortestPath.length > 0) {
+      setShortestPath([]);
+    }
+  }, [shortestPath]);
 
   // Handle airport click for selection
   const handleAirportClick = useCallback((e, airport) => {
@@ -441,6 +480,15 @@ const Grid = () => {
       return;
     }
     
+    // Create a new airport object with all necessary properties
+    const airportWithPosition = {
+      ...airport,
+      position: {
+        lat: airport.latitude || (airport.position?.lat || 0),
+        lon: airport.longitude || (airport.position?.lon || 0)
+      }
+    };
+    
     // If already selected, deselect it
     const isSelected = selectedAirports.some(a => a.id === airport.id);
     if (isSelected) {
@@ -452,30 +500,39 @@ const Grid = () => {
     // If we already have 2 airports, replace the second one
     let newSelectedAirports;
     if (selectedAirports.length >= 2) {
-      newSelectedAirports = [selectedAirports[0], airport];
+      newSelectedAirports = [selectedAirports[0], airportWithPosition];
     } else {
-      newSelectedAirports = [...selectedAirports, airport];
+      newSelectedAirports = [...selectedAirports, airportWithPosition];
     }
     
+    console.log('Setting selected airports:', newSelectedAirports);
     setSelectedAirports(newSelectedAirports);
     
-    // If we have 2 airports, find the path
+    // Clear any existing path immediately
+    setShortestPath([]);
+    
+    // If we have 2 airports, find the path in the next render cycle
     if (newSelectedAirports.length === 2) {
-      findPath();
-    } else {
-      // If we have less than 2 airports, clear any existing path
-      setShortestPath([]);
+      // Use a small timeout to ensure state is updated before finding path
+      setTimeout(() => {
+        console.log('Finding path between:', newSelectedAirports[0].id, 'and', newSelectedAirports[1].id);
+        findPath();
+      }, 0);
     }
   }, [selectedAirports, findPath, handleAirportRightClick, shortestPath]);
   
-  // Run pathfinding when selectedAirports changes
+  // Run pathfinding when selectedAirports or graph changes
   useEffect(() => {
+    console.log('Selected airports changed:', selectedAirports.map(a => `${a.id} (${a.name})`));
+    
     if (selectedAirports.length === 2) {
+      console.log('Two airports selected, finding path...');
       findPath();
     } else {
+      console.log('Not enough airports selected, clearing path');
       setShortestPath([]);
     }
-  }, [selectedAirports, findPath]);
+  }, [selectedAirports, findPath, graph]);
   
   // Normalize airport coordinates for rendering
   const normalizedAirports = useMemo(() => {
@@ -709,11 +766,23 @@ const Grid = () => {
                 ...airport,
                 id: airport.iata || String(airport.id)
               }))}
-              routes={routes.map(route => ({
-                ...route,
-                source: airportCodeMap.get(String(route.source)) || String(route.source),
-                target: airportCodeMap.get(String(route.target)) || String(route.target)
-              }))}
+              routes={routes.map(route => {
+                const sourceId = airportCodeMap.get(String(route.source)) || String(route.source);
+                const targetId = airportCodeMap.get(String(route.target)) || String(route.target);
+                const edgeId = `${sourceId}-${targetId}`;
+                const reverseEdgeId = `${targetId}-${sourceId}`;
+                
+                // Get frequency from edgeFrequencies, checking both directions
+                const frequency = edgeFrequencies[edgeId] || edgeFrequencies[reverseEdgeId] || 1;
+                
+                return {
+                  ...route,
+                  id: edgeId, // Ensure each route has a unique ID
+                  source: sourceId,
+                  target: targetId,
+                  frequency: frequency
+                };
+              })}
               dimensions={dimensions}
               onAirportHover={handleAirportHover}
               onAirportClick={handleAirportClick}
@@ -723,6 +792,7 @@ const Grid = () => {
               disabledAirports={disabledAirports}
               edgeDelays={edgeDelays}
               onEdgeDelayChange={handleEdgeDelayChange}
+              onEdgeFrequencyChange={handleEdgeFrequencyChange}
             />
             
             {/* Plane Animation - Only show when there's a valid path and not in visualization mode */}

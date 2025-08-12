@@ -28,6 +28,7 @@ const GraphCanvas = ({
   disabledAirports = new Set(),
   edgeDelays = {},
   onEdgeDelayChange = () => {},
+  onEdgeFrequencyChange = () => {},
   visualizationMode = 'plane' // 'plane' or 'algorithm'
 }) => {
   // Normalize airport coordinates to fit the container
@@ -47,6 +48,7 @@ const GraphCanvas = ({
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [hoveredAirport, setHoveredAirport] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [edgeTimes, setEdgeTimes] = useState({});
   const tooltipRef = useRef(null);
   
   // Update tooltip position based on mouse movement
@@ -81,17 +83,42 @@ const GraphCanvas = ({
       sourceName: airports.find(a => a.id === route.source)?.name || `Airport ${route.source}`,
       targetName: airports.find(a => a.id === route.target)?.name || `Airport ${route.target}`,
       // Initialize delay if it exists, otherwise default to 0
-      delay: edgeDelays[route.id] || 0
+      delay: edgeDelays[route.id] || 0,
+      // Initialize times if they exist
+      departureTime: edgeTimes[route.id]?.departureTime || '08:00',
+      arrivalTime: edgeTimes[route.id]?.arrivalTime || '10:00'
     });
-  }, [airports, edgeDelays]);
+  }, [airports, edgeDelays, edgeTimes]);
   
   // Handle delay changes from the modal
   const handleDelayChange = useCallback((edgeId, delay) => {
     onEdgeDelayChange(edgeId, delay);
-    
-    // You can add additional logic here to trigger path recalculation
     console.log(`Delay for edge ${edgeId} changed to ${delay} minutes`);
   }, [onEdgeDelayChange]);
+
+  // Handle time updates from the modal
+  const handleTimeUpdate = useCallback((edgeId, times) => {
+    setEdgeTimes(prev => ({
+      ...prev,
+      [edgeId]: {
+        ...prev[edgeId],
+        ...times
+      }
+    }));
+    
+    console.log(`Times updated for edge ${edgeId}:`, times);
+    
+    // You can add additional logic here to trigger path recalculation
+    // based on the new times if needed
+  }, []);
+  
+  // Handle frequency changes from the modal
+  const handleFrequencyChange = useCallback((edgeId, frequency) => {
+    if (onEdgeFrequencyChange) {
+      onEdgeFrequencyChange(edgeId, frequency);
+      console.log(`Frequency for edge ${edgeId} changed to ${frequency} flights/day`);
+    }
+  }, [onEdgeFrequencyChange]);
 
   // Close modal
   const closeModal = useCallback(() => {
@@ -104,6 +131,14 @@ const GraphCanvas = ({
     if (delay <= 30) return 'delay-low';
     if (delay <= 60) return 'delay-medium';
     return 'delay-high';
+  }, []);
+  
+  // Get frequency class based on frequency value
+  const getFrequencyClass = useCallback((frequency) => {
+    if (!frequency || frequency <= 0) return 'frequency-none';
+    if (frequency <= 3) return 'frequency-low';
+    if (frequency <= 7) return 'frequency-medium';
+    return 'frequency-high';
   }, []);
 
   // Memoize route paths
@@ -152,8 +187,10 @@ const GraphCanvas = ({
           midX,
           midY,
           distance: route.distance, // Use the distance from graph.json
+          frequency: route.frequency || 1, // Default to 1 if not specified
           delay,
           delayClass: getDelayClass(delay),
+          frequencyClass: getFrequencyClass(route.frequency || 1),
           isHighlighted
         };
       });
@@ -246,6 +283,8 @@ const GraphCanvas = ({
           edge={selectedEdge}
           onClose={() => setSelectedEdge(null)}
           onDelayChange={handleDelayChange}
+          onFrequencyChange={handleFrequencyChange}
+          onTimeUpdate={handleTimeUpdate}
         />
       )}
       {/* Routes - Rendered first in DOM but visually behind airports */}
@@ -289,7 +328,7 @@ const GraphCanvas = ({
                 {/* Background for better readability */}
                 <text
                   x={route.midX}
-                  y={route.midY}
+                  y={route.midY - 10}
                   className={`route-label route-label-bg ${route.delayClass ? route.delayClass + '-bg' : ''}`}
                   textAnchor="middle"
                   dominantBaseline="middle"
@@ -298,13 +337,42 @@ const GraphCanvas = ({
                 </text>
                 <text
                   x={route.midX}
-                  y={route.midY}
+                  y={route.midY - 10}
                   className={`route-label ${route.delayClass ? route.delayClass + '-text' : ''}`}
                   textAnchor="middle"
                   dominantBaseline="middle"
                 >
                   {route.distance} km{route.delay > 0 ? ` (+${route.delay}m)` : ''}
                 </text>
+                
+                {/* Flight frequency indicator */}
+                <g className={`frequency-indicator ${route.frequencyClass} ${route.delay > 0 ? 'has-delay' : ''}`}>
+                  {Array.from({ length: Math.min(route.frequency || 1, 10) }).map((_, i) => (
+                    <circle
+                      key={i}
+                      cx={route.midX - 15 + (i * 5)}
+                      cy={route.midY + 10}
+                      r={route.delay > 0 ? 3 : 2}
+                      fill={route.delay > 0 ? '#ef4444' : 'currentColor'}
+                      stroke={route.delay > 0 ? '#fff' : 'none'}
+                      strokeWidth={route.delay > 0 ? 0.5 : 0}
+                    />
+                  ))}
+                  <text
+                    x={route.midX + 20}
+                    y={route.midY + 12}
+                    className={`frequency-text ${route.delay > 0 ? 'has-delay' : ''}`}
+                    textAnchor="start"
+                    dominantBaseline="middle"
+                    style={{
+                      fill: route.delay > 0 ? '#ef4444' : 'currentColor',
+                      fontWeight: route.delay > 0 ? 'bold' : 'normal'
+                    }}
+                  >
+                    {route.frequency || 1}/day
+                    {route.delay > 0 && ` (${route.delay}m)`}
+                  </text>
+                </g>
               </g>
             )}
           </g>
@@ -361,7 +429,8 @@ GraphCanvas.propTypes = {
   })),
   routes: PropTypes.arrayOf(PropTypes.shape({
     source: PropTypes.string.isRequired,
-    target: PropTypes.string.isRequired
+    target: PropTypes.string.isRequired,
+    frequency: PropTypes.number
   })),
   dimensions: PropTypes.shape({
     width: PropTypes.number.isRequired,
@@ -369,11 +438,17 @@ GraphCanvas.propTypes = {
   }),
   onAirportHover: PropTypes.func,
   onAirportClick: PropTypes.func,
+  onAirportRightClick: PropTypes.func,
+  onEdgeDelayChange: PropTypes.func,
+  onEdgeFrequencyChange: PropTypes.func,
   selectedAirports: PropTypes.arrayOf(PropTypes.shape({
     id: PropTypes.string.isRequired,
     name: PropTypes.string
   })),
-  highlightedPath: PropTypes.arrayOf(PropTypes.string)
+  highlightedPath: PropTypes.arrayOf(PropTypes.string),
+  disabledAirports: PropTypes.instanceOf(Set),
+  edgeDelays: PropTypes.object,
+  visualizationMode: PropTypes.oneOf(['plane', 'algorithm'])
 };
 
 export default GraphCanvas;
