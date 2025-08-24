@@ -4,6 +4,15 @@ import { FaPlane, FaPlaneArrival, FaPlaneDeparture, FaInfoCircle } from 'react-i
 import { normalizeCoordinates } from '../utils/projection';
 import EdgeDetailsModal from './EdgeDetailsModal';
 import '../styles/GraphCanvas.css';
+import '../styles/HeuristicVisualization.css';
+
+// Heuristic function - Euclidean distance between two points
+function calculateHeuristic(pointA, pointB) {
+  if (!pointA || !pointB) return 0;
+  const dx = pointA.x - pointB.x;
+  const dy = pointA.y - pointB.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
 
 /**
  * GraphCanvas component for rendering airports and routes
@@ -16,6 +25,28 @@ import '../styles/GraphCanvas.css';
  * @param {Array} props.highlightedPath - List of airport IDs in the highlighted path
  * @returns {JSX.Element} GraphCanvas component
  */
+// Function to get color based on heuristic value
+const getHeuristicColor = (value) => {
+  // Colors from close (green) to far (red)
+  const colors = [
+    '#10B981', // Green (close)
+    '#34D399',
+    '#6EE7B7',
+    '#A7F3D0',
+    '#FDE68A', // Yellow (medium)
+    '#FCD34D',
+    '#FBBF24',
+    '#F59E0B',
+    '#F97316', // Orange
+    '#EF4444'  // Red (far)
+  ];
+  
+  // Normalize value between 0-1
+  const normalized = Math.min(Math.max(value / 100, 0), 1);
+  const index = Math.floor(normalized * (colors.length - 1));
+  return colors[index];
+};
+
 const GraphCanvas = ({
   airports = [],
   routes = [],
@@ -29,7 +60,8 @@ const GraphCanvas = ({
   edgeDelays = {},
   onEdgeDelayChange = () => {},
   onEdgeFrequencyChange = () => {},
-  visualizationMode = 'plane' // 'plane' or 'algorithm'
+  visualizationMode = 'plane', // 'plane' or 'algorithm'
+  selectedAlgorithm = null // Add selectedAlgorithm prop
 }) => {
   // Normalize airport coordinates to fit the container
   const normalizedAirports = useMemo(() => {
@@ -127,10 +159,27 @@ const GraphCanvas = ({
 
   // Get delay class based on delay value
   const getDelayClass = useCallback((delay) => {
-    if (!delay || delay <= 0) return '';
-    if (delay <= 30) return 'delay-low';
-    if (delay <= 60) return 'delay-medium';
+    if (!delay || delay === 0) return '';
+    if (delay < 15) return 'delay-low';
+    if (delay < 30) return 'delay-medium';
     return 'delay-high';
+  }, []);
+  
+  // Prevent animation on highlighted elements
+  useEffect(() => {
+    // Add a global style to ensure no animations on highlighted paths
+    const style = document.createElement('style');
+    style.textContent = `
+      .route.highlighted {
+        animation: none !important;
+        transition: stroke-width 0.3s ease !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
   }, []);
   
   // Get frequency class based on frequency value
@@ -202,6 +251,51 @@ const GraphCanvas = ({
            y >= 0 && y <= dimensions.height;
   }, [dimensions]);
 
+  // Calculate heuristics for airports when A* algorithm is selected// Calculate heuristic values for all nodes to display
+  const airportHeuristics = useMemo(() => {
+    // Only calculate heuristics for A* algorithm with a selected target
+    if (selectedAlgorithm !== 'astar' || selectedAirports.length < 2) {
+      return {};
+    }
+    
+    const endAirport = selectedAirports[1]; // Target airport
+    const heuristics = {};
+    
+    // Find min and max heuristic values to normalize for color gradient
+    let minH = Infinity;
+    let maxH = 0;
+    
+    // First pass - calculate all values and find min/max
+    normalizedAirports.forEach(airport => {
+      // Calculate Euclidean distance (heuristic) between this airport and the target
+      const h = calculateHeuristic(
+        { x: airport.x, y: airport.y },
+        { x: endAirport.x, y: endAirport.y }
+      );
+      
+      minH = Math.min(minH, h);
+      maxH = Math.max(maxH, h);
+      
+      // Store the raw value and a formatted value for display
+      heuristics[airport.id] = {
+        value: h,
+        formatted: h.toFixed(0) // Round to integer for display
+      };
+    });
+    
+    // Second pass - add normalized value for color gradient
+    normalizedAirports.forEach(airport => {
+      const h = heuristics[airport.id]?.value || 0;
+      if (maxH !== minH) {
+        heuristics[airport.id].normalized = (h - minH) / (maxH - minH);
+      } else {
+        heuristics[airport.id].normalized = 0;
+      }
+    });
+    
+    return heuristics;
+  }, [selectedAlgorithm, selectedAirports, normalizedAirports]);
+  
   // Filter out airports outside the viewport
   const visibleAirports = useMemo(() => {
     return normalizedAirports.filter(airport => 
@@ -321,6 +415,10 @@ const GraphCanvas = ({
               y2={route.y2}
               strokeWidth={route.isHighlighted ? 8 : 6}
               strokeLinecap="round"
+              style={{
+                animation: 'none',
+                pointerEvents: 'none'
+              }}
             />
             
             {route.distance && (
@@ -373,6 +471,29 @@ const GraphCanvas = ({
                     {route.delay > 0 && ` (${route.delay}m)`}
                   </text>
                 </g>
+                
+                {/* Delay indicator */}
+                {route.delay > 0 && (
+                  <g>
+                    <circle 
+                      cx={route.midX} 
+                      cy={route.midY} 
+                      r={10} 
+                      fill="rgba(255,0,0,0.7)" 
+                    />
+                    <text 
+                      x={route.midX} 
+                      y={route.midY} 
+                      textAnchor="middle" 
+                      dominantBaseline="middle"
+                      fill="white"
+                      fontSize="10px"
+                      fontWeight="bold"
+                    >
+                      {route.delay}
+                    </text>
+                  </g>
+                )}
               </g>
             )}
           </g>
@@ -381,7 +502,7 @@ const GraphCanvas = ({
 
       {/* Airports - Rendered second in DOM but visually on top */}
       <div className="airports-layer">
-        {visibleAirports.map(airport => {
+        {normalizedAirports.map(airport => {
           const isDisabled = disabledAirports.has(String(airport.id));
           const isHighlighted = highlightedPath.includes(airport.id);
           
@@ -408,6 +529,116 @@ const GraphCanvas = ({
               <FaPlane className="airport-icon" />
               {isHighlighted && (
                 <div className="airport-pulse" />
+              )}
+              
+              {/* Enhanced heuristic visualization for A* algorithm */}
+              {selectedAlgorithm === 'astar' && airportHeuristics[airport.id] && (
+                <div className="heuristic-visualization">
+                  {/* Main heuristic label with value */}
+                  <div className="heuristic-label" style={{
+                    position: 'absolute',
+                    top: '20px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                    color: '#FFFFFF',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    zIndex: 20,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                    border: '1px solid #8B5CF6'
+                  }}>
+                    h={airportHeuristics[airport.id].formatted}
+                  </div>
+                  
+                  {/* Visual line showing estimated distance to target */}
+                  {selectedAirports.length >= 2 && (
+                    <svg style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      pointerEvents: 'none',
+                      zIndex: 5,
+                      overflow: 'visible'
+                    }}>
+                      {/* Dashed line showing heuristic distance to target */}
+                      <line 
+                        x1="0"
+                        y1="0"
+                        x2={selectedAirports[1].x - airport.x}
+                        y2={selectedAirports[1].y - airport.y}
+                        className="heuristic-line"
+                        style={{
+                          stroke: '#8B5CF6',
+                          strokeWidth: isHighlighted ? '2px' : '1.5px',
+                          strokeDasharray: '3,2',
+                          strokeOpacity: isHighlighted ? 0.9 : 0.4,
+                          transform: 'translate(0, 0)',
+                          transformOrigin: 'center',
+                          strokeDashoffset: 0
+                        }}
+                      />
+                      {/* Arrow indicating direction of heuristic */}
+                      <polygon 
+                        points="0,0 -3,-6 3,-6"
+                        style={{
+                          fill: '#8B5CF6',
+                          opacity: isHighlighted ? 0.9 : 0.6,
+                          transform: `translate(${(selectedAirports[1].x - airport.x)/2}px, ${(selectedAirports[1].y - airport.y)/2}px) rotate(${Math.atan2(selectedAirports[1].y - airport.y, selectedAirports[1].x - airport.x) * (180/Math.PI)}deg)`,
+                          transformOrigin: 'center'
+                        }}
+                      />
+                    </svg>
+                  )}
+                  
+                  {/* Circular indicator showing heuristic weight */}
+                  <div 
+                    className="heuristic-dot"
+                    style={{
+                      position: 'absolute',
+                      top: '-8px',
+                      left: '-8px',
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      background: `radial-gradient(circle, 
+                        ${getHeuristicColor(airportHeuristics[airport.id].value)} 0%, 
+                        rgba(0,0,0,0.7) 100%)`,
+                      boxShadow: `0 0 5px ${getHeuristicColor(airportHeuristics[airport.id].value)}`,
+                      border: '1px solid rgba(255,255,255,0.5)',
+                      opacity: isHighlighted ? 1 : 0.85,
+                      zIndex: 15
+                    }} 
+                    title={`Heuristic: ${airportHeuristics[airport.id].formatted}`}
+                  />
+                  
+                  {/* Optional: Mini heuristic formula visualization */}
+                  {isHighlighted && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '-24px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                      color: '#FFFFFF',
+                      padding: '2px 5px',
+                      borderRadius: '3px',
+                      fontSize: '9px',
+                      whiteSpace: 'nowrap',
+                      fontFamily: 'monospace',
+                      zIndex: 25,
+                      border: '1px solid #8B5CF6'
+                    }}>
+                      f = g + h({airportHeuristics[airport.id].formatted})
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           );
@@ -448,7 +679,8 @@ GraphCanvas.propTypes = {
   highlightedPath: PropTypes.arrayOf(PropTypes.string),
   disabledAirports: PropTypes.instanceOf(Set),
   edgeDelays: PropTypes.object,
-  visualizationMode: PropTypes.oneOf(['plane', 'algorithm'])
+  visualizationMode: PropTypes.oneOf(['plane', 'algorithm']),
+  selectedAlgorithm: PropTypes.string // Added selectedAlgorithm prop type
 };
 
 export default GraphCanvas;

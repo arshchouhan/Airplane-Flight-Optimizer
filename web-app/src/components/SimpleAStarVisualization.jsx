@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaPlane } from 'react-icons/fa';
+import { FaPlane, FaPlay, FaPause, FaStepForward, FaStepBackward } from 'react-icons/fa';
 import styled, { keyframes } from 'styled-components';
 
 // Simplified colors for better visibility
@@ -153,15 +153,25 @@ const SimpleAStarVisualization = ({
   speed = 100,
   onComplete = () => {}
 }) => {
-  // State
+  // State declarations
   const [nodes, setNodes] = useState([]);
   const [lines, setLines] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [currentNode, setCurrentNode] = useState(null);
   const [visitedNodes, setVisitedNodes] = useState(new Set());
   const [path, setPath] = useState([]);
   const [animationSteps, setAnimationSteps] = useState([]);
   const [currentStep, setCurrentStep] = useState(0);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [playbackSpeed, setPlaybackSpeed] = useState(speed);
+  const [autoAdvanceTimer, setAutoAdvanceTimer] = useState(null);
+  
+  // New state for enhanced A* visualization
+  const [evaluationData, setEvaluationData] = useState({});
+  const [frontierNodes, setFrontierNodes] = useState(new Set());
+  const [bestFrontierNode, setBestFrontierNode] = useState(null);
 
   // Main airports data with relative positions (0-100 range)
   const mainAirports = useMemo(() => [
@@ -360,12 +370,14 @@ const SimpleAStarVisualization = ({
     const openSet = [];
     const closedSet = new Set();
     const nodeMap = {};
+    const frontierSet = new Set(); // Track nodes in the frontier
     
     // Initialize nodes
     nodes.forEach(node => {
       nodeMap[node.id] = { ...node };
       if (node.id === 'start') {
         openSet.push(node.id);
+        frontierSet.add(node.id);
       }
     });
     
@@ -376,25 +388,37 @@ const SimpleAStarVisualization = ({
       return [];
     }
     
+    // Add initial evaluation step showing heuristic calculation for the start node
+    const startNode = nodeMap['start'];
+    steps.push({
+      type: 'evaluate',
+      nodeId: startNode.id,
+      gScore: 0,
+      hScore: heuristic(startNode, endNode),
+      fScore: heuristic(startNode, endNode),
+      bestPath: true
+    });
+    
     // Main A* loop
     while (openSet.length > 0) {
-      // Find node with lowest fScore in openSet
+      // Sort open set by fScore and find best node
       openSet.sort((a, b) => nodeMap[a].fScore - nodeMap[b].fScore);
       const currentId = openSet.shift();
       const current = nodeMap[currentId];
       
-      // Add to visited set
+      // Remove from frontier and add to closed set
+      frontierSet.delete(currentId);
       closedSet.add(currentId);
       
-      // Record visit step
-      if (currentId !== 'start') {
-        steps.push({
-          type: 'visit',
-          nodeId: currentId,
-          fScore: current.fScore,
-          gScore: current.gScore
-        });
-      }
+      // Record visit step - now with additional info to show focused exploration
+      steps.push({
+        type: 'visit',
+        nodeId: currentId,
+        fScore: current.fScore,
+        gScore: current.gScore,
+        hScore: heuristic(current, endNode),
+        frontier: [...frontierSet] // Current frontier nodes
+      });
       
       // Check if we've reached the end
       if (currentId === 'end') {
@@ -439,15 +463,33 @@ const SimpleAStarVisualization = ({
         })
         .filter(n => n.id && !closedSet.has(n.id));
       
-      // Process each neighbor
+      // Process each neighbor and record the evaluation steps
       for (const neighbor of neighbors) {
         const neighborNode = nodeMap[neighbor.id];
         if (!neighborNode) continue;
         
         const tentativeGScore = current.gScore + neighbor.distance;
+        const previousGScore = neighborNode.gScore;
+        const hScore = heuristic(neighborNode, endNode);
+        const newFScore = tentativeGScore + hScore;
+        const betterPath = tentativeGScore < previousGScore;
         
-        if (!openSet.includes(neighbor.id)) {
-          openSet.push(neighbor.id);
+        // Record the evaluation step for visualization
+        steps.push({
+          type: 'evaluate',
+          nodeId: neighborNode.id,
+          parentId: current.id,
+          gScore: tentativeGScore,
+          previousGScore,
+          hScore,
+          fScore: newFScore,
+          distance: neighbor.distance,
+          bestPath: betterPath
+        });
+        
+        if (!openSet.includes(neighborNode.id)) {
+          openSet.push(neighborNode.id);
+          frontierSet.add(neighborNode.id);
         } else if (tentativeGScore >= neighborNode.gScore) {
           continue; // This is not a better path
         }
@@ -455,69 +497,284 @@ const SimpleAStarVisualization = ({
         // This path is the best so far, record it
         neighborNode.cameFrom = currentId;
         neighborNode.gScore = tentativeGScore;
-        neighborNode.fScore = tentativeGScore + heuristic(neighborNode, endNode);
+        neighborNode.fScore = newFScore;
+      }
+      
+      // After processing all neighbors, add a step showing the updated frontier
+      if (neighbors.length > 0) {
+        steps.push({
+          type: 'frontier',
+          currentNodeId: currentId,
+          frontierNodes: [...frontierSet],
+          openSet: [...openSet].map(id => ({
+            id,
+            fScore: nodeMap[id].fScore,
+            gScore: nodeMap[id].gScore,
+            hScore: heuristic(nodeMap[id], endNode)
+          })).sort((a, b) => a.fScore - b.fScore)
+        });
       }
     }
     
     return steps;
   }, [heuristic]);
   
-  // Process animation steps one by one
-  const processAnimationStep = useCallback((steps, index) => {
-    if (index >= steps.length) {
-      setIsRunning(false);
-      onComplete();
+  // Process a single animation step
+  const processAnimationStep = useCallback((steps, index, isForward = true) => {
+    // Handle step out of bounds
+    if (index >= steps.length || index < 0) {
+      if (index >= steps.length) {
+        setIsRunning(false);
+        onComplete();
+      }
       return;
     }
     
+    // Apply the current step
     const step = steps[index];
     setCurrentStep(index);
     
-    switch (step.type) {
-      case 'visit':
-        setVisitedNodes(prev => {
-          const newVisited = new Set(prev);
-          newVisited.add(step.nodeId);
-          return newVisited;
-        });
-        setCurrentNode(step.nodeId);
-        break;
-        
-      case 'path':
-        setPath(prev => [...prev, step.from, step.to]);
-        break;
-        
-      case 'complete':
-        setPath(step.path);
-        setCurrentNode(null);
-        break;
+    if (isForward) {
+      // Forward step processing
+      switch (step.type) {
+        case 'evaluate':
+          // Store evaluation data for display
+          setEvaluationData(prev => ({
+            ...prev,
+            [step.nodeId]: {
+              gScore: step.gScore,
+              hScore: step.hScore,
+              fScore: step.fScore,
+              parentId: step.parentId,
+              bestPath: step.bestPath
+            }
+          }));
+          // Don't change current node during evaluation
+          break;
+          
+        case 'frontier':
+          // Update frontier nodes
+          setFrontierNodes(new Set(step.frontierNodes));
+          // Set best node from the sorted open set
+          if (step.openSet && step.openSet.length > 0) {
+            setBestFrontierNode(step.openSet[0].id);
+          }
+          break;
+          
+        case 'visit':
+          // Update visited nodes
+          setVisitedNodes(prev => {
+            const newVisited = new Set(prev);
+            newVisited.add(step.nodeId);
+            return newVisited;
+          });
+          // Update current node
+          setCurrentNode(step.nodeId);
+          // Update frontier if available
+          if (step.frontier) {
+            setFrontierNodes(new Set(step.frontier));
+          }
+          break;
+          
+        case 'path':
+          setPath(prev => [...prev, step.from, step.to]);
+          break;
+          
+        case 'complete':
+          setPath(step.path);
+          setCurrentNode(null);
+          setFrontierNodes(new Set()); // Clear frontier
+          break;
+      }
+    } else {
+      // Backward step processing - revert the previous step
+      const previousStep = steps[index + 1]; // The step we're undoing
+      if (!previousStep) return;
+      
+      switch (previousStep.type) {
+        case 'evaluate':
+          // Remove evaluation data for this node
+          setEvaluationData(prev => {
+            const newData = { ...prev };
+            delete newData[previousStep.nodeId];
+            return newData;
+          });
+          break;
+          
+        case 'frontier':
+          // Reconstruct frontier from previous steps
+          const prevFrontierStep = steps.slice(0, index + 1)
+            .filter(s => s.type === 'frontier' || s.type === 'visit')
+            .pop();
+          
+          if (prevFrontierStep?.frontierNodes) {
+            setFrontierNodes(new Set(prevFrontierStep.frontierNodes));
+          } else if (prevFrontierStep?.frontier) {
+            setFrontierNodes(new Set(prevFrontierStep.frontier));
+          } else {
+            setFrontierNodes(new Set());
+          }
+          
+          // Update best frontier node
+          const prevBestNodeStep = steps.slice(0, index + 1)
+            .filter(s => s.type === 'frontier' && s.openSet?.length > 0)
+            .pop();
+          
+          if (prevBestNodeStep) {
+            setBestFrontierNode(prevBestNodeStep.openSet[0].id);
+          } else {
+            setBestFrontierNode(null);
+          }
+          break;
+          
+        case 'visit':
+          setVisitedNodes(prev => {
+            const newVisited = new Set(prev);
+            newVisited.delete(previousStep.nodeId);
+            return newVisited;
+          });
+          // Set current node to the last visited node
+          const lastVisitStep = steps.slice(0, index + 1)
+            .filter(s => s.type === 'visit')
+            .pop();
+          setCurrentNode(lastVisitStep ? lastVisitStep.nodeId : null);
+          break;
+          
+        case 'path':
+          // Remove the last segment from the path
+          setPath(prev => {
+            const newPath = [...prev];
+            newPath.pop(); // Remove to
+            newPath.pop(); // Remove from
+            return newPath;
+          });
+          break;
+          
+        case 'complete':
+          // Revert to the path state before completion
+          const pathSteps = steps
+            .slice(0, index + 1)
+            .filter(s => s.type === 'path');
+            
+          // Reconstruct path from path steps
+          const reconstructedPath = [];
+          pathSteps.forEach(pathStep => {
+            if (!reconstructedPath.includes(pathStep.from)) {
+              reconstructedPath.push(pathStep.from);
+            }
+            if (!reconstructedPath.includes(pathStep.to)) {
+              reconstructedPath.push(pathStep.to);
+            }
+          });
+          
+          setPath(reconstructedPath);
+          // Set current node to last visited
+          const lastVisit = steps.slice(0, index + 1)
+            .filter(s => s.type === 'visit')
+            .pop();
+          setCurrentNode(lastVisit ? lastVisit.nodeId : null);
+          
+          // Restore frontier from last frontier step
+          const lastFrontierStep = steps.slice(0, index + 1)
+            .filter(s => s.type === 'frontier' || (s.type === 'visit' && s.frontier))
+            .pop();
+          
+          if (lastFrontierStep?.frontierNodes) {
+            setFrontierNodes(new Set(lastFrontierStep.frontierNodes));
+          } else if (lastFrontierStep?.frontier) {
+            setFrontierNodes(new Set(lastFrontierStep.frontier));
+          }
+          
+          break;
+      }
+    }
+  }, [onComplete]);
+  
+  // Auto-advance to next step during playback
+  const autoAdvanceStep = useCallback(() => {
+    if (!isPaused && isRunning && currentStep < animationSteps.length - 1) {
+      // Calculate delay based on step type
+      const step = animationSteps[currentStep];
+      let delay = playbackSpeed;
+      if (step) {
+        if (step.type === 'visit') delay = playbackSpeed * 1.5;
+        else if (step.type === 'path') delay = playbackSpeed * 2;
+        else if (step.type === 'complete') delay = playbackSpeed * 3;
+      }
+      
+      const timer = setTimeout(() => {
+        processAnimationStep(animationSteps, currentStep + 1, true);
+        setCurrentStep(prevStep => prevStep + 1);
+      }, delay);
+      
+      setAutoAdvanceTimer(timer);
+      
+      return () => {
+        if (timer) clearTimeout(timer);
+      };
+    }
+  }, [animationSteps, currentStep, isRunning, isPaused, playbackSpeed, processAnimationStep]);
+  
+  // Control playback functions
+  const playAnimation = useCallback(() => {
+    if (currentStep >= animationSteps.length - 1) {
+      // Reset if at the end
+      setVisitedNodes(new Set());
+      setPath([]);
+      setCurrentNode(null);
+      setCurrentStep(0);
     }
     
-    // Schedule next step with appropriate delay
-    let delay = speed;
-    if (step.type === 'visit') delay = speed * 1.5;
-    else if (step.type === 'path') delay = speed * 2;
-    else if (step.type === 'complete') delay = speed * 3;
-    
-    const timer = setTimeout(() => {
-      processAnimationStep(steps, index + 1);
-    }, delay);
-    
-    return () => clearTimeout(timer);
-  }, [speed, onComplete]);
-  
-  // Animate the A* algorithm steps
-  const animateSteps = useCallback((steps) => {
-    if (!steps.length) return;
-    
+    setIsPaused(false);
     setIsRunning(true);
+  }, [animationSteps.length, currentStep]);
+  
+  const pauseAnimation = useCallback(() => {
+    setIsPaused(true);
+    if (autoAdvanceTimer) {
+      clearTimeout(autoAdvanceTimer);
+      setAutoAdvanceTimer(null);
+    }
+  }, [autoAdvanceTimer]);
+  
+  const goToNextStep = useCallback(() => {
+    if (currentStep < animationSteps.length - 1) {
+      processAnimationStep(animationSteps, currentStep + 1, true);
+      setCurrentStep(prevStep => prevStep + 1);
+    }
+  }, [animationSteps, currentStep, processAnimationStep]);
+  
+  const goToPreviousStep = useCallback(() => {
+    if (currentStep > 0) {
+      processAnimationStep(animationSteps, currentStep - 1, false);
+      setCurrentStep(prevStep => prevStep - 1);
+    }
+  }, [animationSteps, currentStep, processAnimationStep]);
+  
+  const resetAnimation = useCallback(() => {
     setVisitedNodes(new Set());
     setPath([]);
     setCurrentNode(null);
-    
-    // Start processing steps
-    processAnimationStep(steps, 0);
-  }, [processAnimationStep]);
+    setCurrentStep(0);
+    setIsPaused(true);
+    setIsRunning(false);
+    if (autoAdvanceTimer) {
+      clearTimeout(autoAdvanceTimer);
+      setAutoAdvanceTimer(null);
+    }
+  }, [autoAdvanceTimer]);
+  
+  // Trigger auto-advance during playback
+  useEffect(() => {
+    if (isRunning && !isPaused) {
+      autoAdvanceStep();
+    }
+    return () => {
+      if (autoAdvanceTimer) {
+        clearTimeout(autoAdvanceTimer);
+      }
+    };
+  }, [isRunning, isPaused, currentStep, autoAdvanceStep, autoAdvanceTimer]);
   
   // Initialize nodes and lines and run A* algorithm
   useEffect(() => {
@@ -528,33 +785,20 @@ const SimpleAStarVisualization = ({
     setNodes(newNodes);
     setLines(newLines);
     
-    // Run A* algorithm and start animation
+    // Run A* algorithm but don't auto-start animation
     const timer = setTimeout(() => {
       const steps = runAStar(newNodes, newLines);
       if (steps.length > 0) {
         setAnimationSteps(steps);
         setCurrentStep(0);
-        
-        // Start animation
-        const interval = setInterval(() => {
-          setCurrentStep(prev => {
-            if (prev >= steps.length - 1) {
-              clearInterval(interval);
-              setIsRunning(false);
-              return prev;
-            }
-            return prev + 1;
-          });
-        }, speed);
-        
-        return () => clearInterval(interval);
+        setIsPaused(true);  // Start in paused state
       } else {
         console.error('No steps generated by A* algorithm');
       }
     }, 500); // Short delay to ensure nodes are rendered
     
     return () => clearTimeout(timer);
-  }, [startPoint, endPoint, generateNodes, generateLines, runAStar, speed]);
+  }, [startPoint, endPoint, generateNodes, generateLines, runAStar]);
   
   // Clean up on unmount
   useEffect(() => {
@@ -568,17 +812,25 @@ const SimpleAStarVisualization = ({
     };
   }, []);
   
-  // Start animation when steps are ready
+  // Initialize but don't auto-start animation when steps are ready
   useEffect(() => {
-    if (animationSteps.length > 0 && !isRunning) {
-      animateSteps(animationSteps);
+    if (animationSteps.length > 0 && !isInitialized) {
+      setIsInitialized(true);
+      // Initialize state but don't auto-play
+      setVisitedNodes(new Set());
+      setPath([]);
+      setCurrentNode(null);
+      setCurrentStep(0);
     }
     
     // Clean up on unmount
     return () => {
+      if (autoAdvanceTimer) {
+        clearTimeout(autoAdvanceTimer);
+      }
       setIsRunning(false);
     };
-  }, [animationSteps, animateSteps, isRunning]);
+  }, [animationSteps, isInitialized, autoAdvanceTimer]);
 
   // Check if a line is part of the path
   const isLineInPath = useCallback((line) => {
@@ -629,10 +881,30 @@ const SimpleAStarVisualization = ({
     if (node.id === currentNode) return { 
       type: 'current', 
       color: '#F59E0B', 
-      bgColor: 'rgba(245, 158, 11, 0.3)',
+      bgColor: 'rgba(245, 158, 11, 0.7)',
       text: node.name || node.id.toUpperCase(),
       size: 1.7,
-      textSize: '1.3px'
+      textSize: '1.3px',
+      pulse: true
+    };
+    // Special highlight for the best node in frontier (with lowest f-score)
+    if (node.id === bestFrontierNode) return {
+      type: 'frontier-best',
+      color: '#EC4899', // Pink
+      bgColor: 'rgba(236, 72, 153, 0.5)',
+      text: node.name || node.id.toUpperCase(),
+      size: 1.6,
+      textSize: '1.2px',
+      glow: true
+    };
+    // Frontier nodes - nodes discovered but not yet processed
+    if (frontierNodes.has(node.id)) return {
+      type: 'frontier',
+      color: '#14B8A6', // Teal
+      bgColor: 'rgba(20, 184, 166, 0.4)',
+      text: node.name || node.id.toUpperCase(),
+      size: 1.5,
+      textSize: '1.2px'
     };
     if (visitedNodes.has(node.id)) return { 
       type: 'visited', 
@@ -653,8 +925,94 @@ const SimpleAStarVisualization = ({
     };
   };
 
+  // Create control panel styling
+  const ControlPanel = styled.div`
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+    pointer-events: auto;
+  `;
+  
+  const ControlButton = styled.button`
+    background-color: #1E293B;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background-color: #334155;
+      transform: translateY(-2px);
+    }
+    
+    &:active {
+      transform: translateY(0);
+    }
+    
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  `;
+  
+  const StepCounter = styled.div`
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    margin: 0 4px;
+  `;
+
   return (
     <Container>
+      {showControls && animationSteps.length > 0 && (
+        <ControlPanel>
+          <ControlButton 
+            onClick={goToPreviousStep}
+            disabled={currentStep <= 0}
+            title="Previous Step"
+          >
+            <FaStepBackward />
+          </ControlButton>
+          
+          {isRunning && !isPaused ? (
+            <ControlButton onClick={pauseAnimation} title="Pause">
+              <FaPause />
+            </ControlButton>
+          ) : (
+            <ControlButton onClick={playAnimation} title="Play">
+              <FaPlay />
+            </ControlButton>
+          )}
+          
+          <ControlButton 
+            onClick={goToNextStep}
+            disabled={currentStep >= animationSteps.length - 1}
+            title="Next Step"
+          >
+            <FaStepForward />
+          </ControlButton>
+          
+          <StepCounter>
+            {currentStep + 1} / {animationSteps.length}
+          </StepCounter>
+        </ControlPanel>
+      )}
+      
       <Svg viewBox="0 0 100 100" preserveAspectRatio="none">
         {/* Gradient definitions */}
         <defs>
@@ -682,13 +1040,32 @@ const SimpleAStarVisualization = ({
             <stop offset="0%" stopColor="#1F2937" />
             <stop offset="100%" stopColor="#111827" />
           </linearGradient>
+          <linearGradient id="frontierGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#14B8A6" />
+            <stop offset="100%" stopColor="#0D9488" />
+          </linearGradient>
+          <linearGradient id="frontierBestGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#EC4899" />
+            <stop offset="100%" stopColor="#DB2777" />
+          </linearGradient>
           
-          {/* Glow effects */}
+          {/* Glowing effect filter for best frontier node */}
           <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="1" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
           </filter>
-        </defs>
+          
+          {/* Pulsing animation */}
+          <radialGradient id="pulseGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+            <stop offset="0%" stopColor="rgba(245, 158, 11, 0.8)" />
+            <stop offset="100%" stopColor="rgba(245, 158, 11, 0)" />
+            <animate attributeName="r" values="0%;50%;0%" dur="2s" repeatCount="indefinite" />
+          </radialGradient>
+        </defs>  
+        
         {/* Render lines with labels */}
         {lines.map((line, index) => {
           // Calculate the actual distance in kilometers (scaling the visual distance)
@@ -755,7 +1132,8 @@ const SimpleAStarVisualization = ({
           const { type, color, bgColor, text, size, textSize, opacity = 1 } = getNodeState(node);
           const isStartOrEnd = type === 'start' || type === 'end';
           const isVisited = type === 'visited' || type === 'path' || isStartOrEnd;
-          const showHeuristic = isVisited && !isStartOrEnd;
+          // Show heuristics for all nodes except start/end
+          const showHeuristic = !isStartOrEnd;
           const heuristicValue = nodeHeuristics[node.id]?.formatted || '';
           const textYOffset = type === 'current' ? -2 : 0;
           
@@ -812,26 +1190,40 @@ const SimpleAStarVisualization = ({
                 {text}
               </text>
               
-              {/* Heuristic value */}
+              {/* Heuristic value with h= label */}
               {showHeuristic && (
-                <text
-                  x={`${node.x}%`}
-                  y={`${parseFloat(node.y) + 1.8}%`}
-                  textAnchor="middle"
-                  style={{
-                    fontSize: '1.1px',
-                    fill: type === 'path' ? '#8B5CF6' : '#A5B4FC',
-                    pointerEvents: 'none',
-                    textShadow: '0 0 2px #000',
-                    fontWeight: '500',
-                    userSelect: 'none',
-                    fontFamily: 'monospace',
-                    opacity: opacity * 0.9,
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {heuristicValue}
-                </text>
+                <g>
+                  {/* Background for better readability */}
+                  <rect
+                    x={`${parseFloat(node.x) - 2.5}%`}
+                    y={`${parseFloat(node.y) + 1}%`}
+                    width="5%"
+                    height="1.8%"
+                    rx="0.5%"
+                    ry="0.5%"
+                    fill="rgba(0,0,0,0.6)"
+                    stroke={type === 'path' ? '#8B5CF6' : '#6B7280'}
+                    strokeWidth="0.1%"
+                  />
+                  <text
+                    x={`${node.x}%`}
+                    y={`${parseFloat(node.y) + 2}%`}
+                    textAnchor="middle"
+                    style={{
+                      fontSize: '1.1px',
+                      fill: type === 'path' ? '#8B5CF6' : '#FFFFFF',
+                      pointerEvents: 'none',
+                      textShadow: '0 0 2px #000',
+                      fontWeight: '700',
+                      userSelect: 'none',
+                      fontFamily: 'monospace',
+                      opacity: 1,
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    h={heuristicValue}
+                  </text>
+                </g>
               )}
             </g>
           );
