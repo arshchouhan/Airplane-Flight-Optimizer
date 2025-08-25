@@ -1,22 +1,25 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import useGraphData from '../hooks/useGraphData';
-import { normalizeCoordinates } from '../utils/projection';
-import { Graph, findDijkstraPath, findPathAStar } from '../utils/graph';
+import useToast from '../hooks/useToast';
+import { normalizeCoordinates, unproject } from '../utils/projection';
+import { Graph, findDijkstraPath, findAStarPath } from '../utils/graph';
 import GraphCanvas from './GraphCanvas';
 import Tooltip from './Tooltip';
+import Toast from './Toast';
 import PlaneAnimation from './PlaneAnimation';
 import AlgorithmVisualization from './AlgorithmVisualization';
-import AnimationControls from './AnimationControls';
+import AStarVisualization from './AStarVisualization';
 import AlgorithmSelector from './AlgorithmSelector';
 import AlgorithmSettingsPanel from './AlgorithmSettingsPanel';
-import SimpleAStarVisualization from './SimpleAStarVisualization';
 import '../styles/Grid.css';
 
 const Grid = () => {
-  const [showAStarVisualization, setShowAStarVisualization] = useState(false);
+  // A* visualization removed
   const [showVisualization, setShowVisualization] = useState(false);
   // Use the custom hook to fetch graph data
-  const { airports, routes, isLoading, error } = useGraphData();
+  const { airports, routes, isLoading, error, addAirport, removeAirport, addRoute, resetToOriginal } = useGraphData();
+  // Toast notifications
+  const { toasts, showToast, removeToast } = useToast();
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [tooltip, setTooltip] = useState({
     visible: false,
@@ -27,6 +30,11 @@ const Grid = () => {
   const [selectedAirports, setSelectedAirports] = useState([]);
   const [shortestPath, setShortestPath] = useState([]);
   const [disabledAirports, setDisabledAirports] = useState(new Set());
+  
+  // Separate state for A* algorithm
+  const [astarSelectedAirports, setAstarSelectedAirports] = useState([]);
+  const [astarShortestPath, setAstarShortestPath] = useState([]);
+  const [astarDisabledAirports, setAstarDisabledAirports] = useState(new Set());
   const [edgeDelays, setEdgeDelays] = useState({});
   const [edgeFrequencies, setEdgeFrequencies] = useState({});
   const [selectedAlgorithm, setSelectedAlgorithm] = useState(null);
@@ -40,6 +48,9 @@ const Grid = () => {
     algorithmSteps: 0,
     memoryUsage: '0 MB'
   });
+  const [isAirportEditMode, setIsAirportEditMode] = useState(false);
+  const [isEdgeDrawMode, setIsEdgeDrawMode] = useState(false);
+  const [selectedAirportsForEdge, setSelectedAirportsForEdge] = useState([]);
   
   const containerRef = useRef(null);
   
@@ -102,6 +113,29 @@ const Grid = () => {
     return finalWeight;
   }, [routes, edgeDelays, edgeFrequencies]);
   
+  // Get current state based on selected algorithm
+  const getCurrentState = useCallback(() => {
+    if (selectedAlgorithm === 'astar') {
+      return {
+        selectedAirports: astarSelectedAirports,
+        shortestPath: astarShortestPath,
+        disabledAirports: astarDisabledAirports,
+        setSelectedAirports: setAstarSelectedAirports,
+        setShortestPath: setAstarShortestPath,
+        setDisabledAirports: setAstarDisabledAirports
+      };
+    } else {
+      return {
+        selectedAirports,
+        shortestPath,
+        disabledAirports,
+        setSelectedAirports,
+        setShortestPath,
+        setDisabledAirports
+      };
+    }
+  }, [selectedAlgorithm, selectedAirports, shortestPath, disabledAirports, astarSelectedAirports, astarShortestPath, astarDisabledAirports]);
+
   // Initialize graph with current airports and routes
   const graph = useMemo(() => {
     const g = new Graph();
@@ -135,117 +169,62 @@ const Grid = () => {
       selectedAlgorithm,
       selectedAirports: selectedAirports?.map(a => a.id),
       visualizationMode,
-      showAStarVisualization,
       showVisualization
     });
 
-    if (!selectedAlgorithm || selectedAirports.length !== 2) {
+    const currentState = getCurrentState();
+    if (!selectedAlgorithm || currentState.selectedAirports.length !== 2) {
       console.log('Cannot toggle visualization - missing algorithm or airports');
       console.log('Selected algorithm:', selectedAlgorithm);
-      console.log('Selected airports count:', selectedAirports.length);
-      console.log('Selected airports:', selectedAirports);
+      console.log('Selected airports count:', currentState.selectedAirports.length);
+      console.log('Selected airports:', currentState.selectedAirports);
       return;
     }
     
-    // For A* algorithm
-    if (selectedAlgorithm === 'astar') {
-      console.log('Toggling A* visualization');
+    // Toggle between plane and algorithm modes
+    const newMode = visualizationMode === 'plane' ? 'algorithm' : 'plane';
+    
+    // Clear existing visualization first
+    setShowVisualization(false);
+    currentState.setShortestPath([]);
+    
+    // Small delay to ensure state updates before showing new visualization
+    setTimeout(() => {
+      setVisualizationMode(newMode);
+      setShowVisualization(true);
       
-      // Toggle between plane and algorithm mode
-      const newMode = visualizationMode === 'plane' ? 'algorithm' : 'plane';
-      console.log(`Switching to ${newMode} mode`);
-      
-      // Clear any existing visualization
-      setShowVisualization(false);
-      setShowAStarVisualization(false);
-      setShortestPath([]);
-      
-      // Small delay to ensure state updates before showing new visualization
-      setTimeout(() => {
-        // Update the visualization mode
-        setVisualizationMode(newMode);
-        
-        if (newMode === 'algorithm') {
-          // Show A* visualization in algorithm mode
-          setShowAStarVisualization(true);
-          setShowVisualization(true);
-          
-          // Recalculate path to ensure we have the latest data
-          console.log('Recalculating path for A* visualization...');
-          findPath();
-        } else {
-          // In plane mode, just show the path without visualization
-          setShowAStarVisualization(false);
-          setShowVisualization(true);
-          findPath();
-        }
-      }, 50);
-    } else {
-      // For other algorithms (like Dijkstra), toggle between plane and algorithm modes
-      const newMode = visualizationMode === 'plane' ? 'algorithm' : 'plane';
-      
-      // Clear existing visualization first
-      setShowVisualization(false);
-      setShortestPath([]);
-      
-      // Small delay to ensure state updates before showing new visualization
-      setTimeout(() => {
-        setVisualizationMode(newMode);
-        
-        if (newMode === 'algorithm' && selectedAirports.length === 2) {
-          // Show algorithm visualization and find path
-          setShowVisualization(true);
-          findPath();
-        } else if (newMode === 'plane') {
-          // Just show the path in plane mode
-          setShowVisualization(true);
-          findPath();
-        }
-      }, 50);
-      
-      // Always hide A* visualization for non-A* algorithms
-      setShowAStarVisualization(false);
-    }
-  }, [selectedAlgorithm, selectedAirports, visualizationMode]);
+      // Always run findPath to ensure visualization has data
+      setTimeout(() => findPath(), 0);
+    }, 50);
+  }, [selectedAlgorithm, visualizationMode, getCurrentState]);
 
   // Handle algorithm change
-  const handleAlgorithmChange = useCallback((algorithm) => {
+  const handleAlgorithmChange = useCallback((algorithm, isDoubleClick = false) => {
     const isSameAlgorithm = algorithm === selectedAlgorithm;
     
     // Always reset all visualization states first
     setShowVisualization(false);
-    setShowAStarVisualization(false);
-    setVisualizationMode('plane');
-    setShortestPath([]);
+    setIsPathfinding(false);
+    setShowSettingsPanel(false);
     
-    // Toggle settings panel if clicking the same algorithm
-    if (isSameAlgorithm) {
-      setShowSettingsPanel(prev => !prev);
-    } else {
-      // Change algorithm and show settings for a new algorithm
-      setSelectedAlgorithm(algorithm);
+    if (isSameAlgorithm && isDoubleClick) {
+      // Only show panel on double-click of same algorithm
+      console.log(`Double-clicked same algorithm: ${algorithm}`);
       setShowSettingsPanel(true);
+    } else if (!isSameAlgorithm) {
+      // If selecting a different algorithm, just set it
+      console.log(`Algorithm changed to: ${algorithm}`);
+      setSelectedAlgorithm(algorithm);
       
-      // For A*, start with plane visualization by default
-      if (algorithm === 'astar') {
-        setVisualizationMode('plane');
-        setShowAStarVisualization(false);
-      } else {
-        // For other algorithms (like Dijkstra), ensure proper visualization mode
-        setVisualizationMode('plane');
-        setShowAStarVisualization(false);
-      }
-      
-      // Reset metrics when changing algorithm
+      // Reset performance metrics for new algorithm
       setPerformanceMetrics({
         executionTime: 0,
         visitedNodes: 0,
         pathCost: 0,
-        algorithmSteps: 0,
         memoryUsage: '0 MB'
       });
     }
-  }, [selectedAlgorithm]);
+  }, [selectedAlgorithm, getCurrentState]);
 
   // Close settings panel
   const closeSettingsPanel = useCallback(() => {
@@ -254,17 +233,15 @@ const Grid = () => {
 
   // Find path using the selected algorithm
   const findPath = useCallback(async () => {
-    // Reset visualization states first
-    setShowVisualization(false);
-    setShowAStarVisualization(false);
+    const currentState = getCurrentState();
     
-    if (!selectedAirports || selectedAirports.length !== 2) {
+    if (!currentState.selectedAirports || currentState.selectedAirports.length !== 2) {
       console.log('Not enough airports selected, clearing path');
-      setShortestPath([]);
+      currentState.setShortestPath([]);
       return;
     }
     
-    const [startAirport, endAirport] = selectedAirports;
+    const [startAirport, endAirport] = currentState.selectedAirports;
     const startNode = String(startAirport.id);
     const endNode = String(endAirport.id);
     
@@ -273,19 +250,20 @@ const Grid = () => {
     // Don't proceed if no algorithm is selected
     if (!selectedAlgorithm) {
       console.log('Please select an algorithm first');
-      setShortestPath([]);
+      currentState.setShortestPath([]);
       return;
     }
     
-    // Show settings panel and reset metrics
-    setShowSettingsPanel(true);
+    // Don't auto-show settings panel - only on double-click
     setIsPathfinding(true);
     
+    // Enable visualization for both algorithms
+    setShowVisualization(true);
+    
     // Skip if either selected airport is disabled
-    if (disabledAirports.has(startNode) || disabledAirports.has(endNode)) {
+    if (currentState.disabledAirports.has(startNode) || currentState.disabledAirports.has(endNode)) {
       console.log('One or both selected airports are disabled');
-      setShortestPath([]);
-      setShowAStarVisualization(false);
+      currentState.setShortestPath([]);
       setShowVisualization(false);
       setIsPathfinding(false);
       return;
@@ -307,22 +285,15 @@ const Grid = () => {
       
       // Find path using the selected algorithm
       let result;
-      if (selectedAlgorithm === 'astar') {
-        // For A*, we need to create a map of node positions for the heuristic
-        const nodePositions = {};
-        airports.forEach(airport => {
-          nodePositions[String(airport.id)] = {
-            x: airport.longitude || 0,
-            y: airport.latitude || 0
-          };
-        });
-        
-        console.log('Using A* with node positions:', nodePositions);
-        result = findPathAStar(graph, startNode, endNode, nodePositions);
-      } else {
-        // For Dijkstra
+      if (selectedAlgorithm === 'dijkstra') {
         console.log('Using Dijkstra algorithm');
         result = findDijkstraPath(graph, startNode, endNode);
+      } else if (selectedAlgorithm === 'astar') {
+        console.log('Using A* algorithm');
+        result = findAStarPath(graph, startNode, endNode, airports);
+      } else {
+        console.log('Unknown algorithm:', selectedAlgorithm);
+        return;
       }
       
       console.log('Pathfinding result:', result);
@@ -347,7 +318,8 @@ const Grid = () => {
       let totalFrequency = 0;
       let numberOfHops = 0;
       
-      if (result.path && result.path.length > 1) {
+      if (result.path && result.path.length > 0) {
+        currentState.setShortestPath(result.path);
         numberOfHops = result.path.length - 1;
         
         // Sum up actual distances and delays along the path
@@ -392,37 +364,20 @@ const Grid = () => {
       const delaysFactor = totalDelays / 50; // Normalize by 50 minutes
       const visitedFactor = visitedNodesCount / nodeCount;
       
-      let executionTime;
-      if (selectedAlgorithm === 'astar') {
-        // A* is extremely efficient and barely affected by path complexity
-        const astarBase = 0.01; // Nearly instantaneous
-        const astarComplexityImpact = 0.004; // Very small impact from complexity
-        
-        // A* time mostly depends on direct path factors with minimal overhead
-        const calculatedTime = astarBase + 
-                             (distanceFactor * 0.004) +
-                             (hopsFactor * 0.002) +
-                             (pathHashFactor * 0.01);
-        
-        // Ensure time is always very small but does vary with the path
-        executionTime = Math.max(calculatedTime, 0.01).toFixed(2);
-        console.log(`A* time: ${executionTime}ms (path: ${result.path?.join('-')})`);
-      } else {
-        // Dijkstra is much more affected by the number of nodes it has to explore
-        const dijkstraBase = 8; // Higher starting point
-        
-        // Dijkstra has to explore much more of the graph, so visited nodes factor is important
-        const calculatedTime = dijkstraBase + 
-                             (distanceFactor * 2.0) +
-                             (visitedFactor * 10) +
-                             (hopsFactor * 1.5) +
-                             (delaysFactor * 0.8) +
-                             (pathHashFactor * 4);
-        
-        // Ensure Dijkstra time is always significantly higher than A* time
-        executionTime = Math.max(calculatedTime, 8).toFixed(2);
-        console.log(`Dijkstra time: ${executionTime}ms (path: ${result.path?.join('-')})`);
-      }
+      // Dijkstra is affected by the number of nodes it has to explore
+      const dijkstraBase = 8; // Base calculation time
+      
+      // Dijkstra has to explore much more of the graph, so visited nodes factor is important
+      const calculatedTime = dijkstraBase + 
+                           (distanceFactor * 2.0) +
+                           (visitedFactor * 10) +
+                           (hopsFactor * 1.5) +
+                           (delaysFactor * 0.8) +
+                           (pathHashFactor * 4);
+      
+      // Calculate execution time
+      const executionTime = Math.max(calculatedTime, 8).toFixed(2);
+      console.log(`Dijkstra time: ${executionTime}ms (path: ${result.path?.join('-')})`);
       
       // Force garbage collection and wait a bit for memory to stabilize
       if (window.gc) {
@@ -440,28 +395,9 @@ const Grid = () => {
         // Update the path first
         setShortestPath(result.path);
         
-        // Set appropriate visualization state based on the selected algorithm and current mode
-        if (selectedAlgorithm === 'astar') {
-          console.log('A* algorithm selected, setting visualization state', {
-            visualizationMode,
-            shouldShowAStar: visualizationMode === 'algorithm',
-            shouldShowVisualization: true
-          });
-          
-          // For A*, we want to show the visualization when in algorithm mode
-          const shouldShowAStar = visualizationMode === 'algorithm';
-          
-          // Update both states in a single batch
-          setShowAStarVisualization(shouldShowAStar);
-          
-          // Only set showVisualization to true for algorithm mode
-          // For plane mode, we want to keep it false so the plane animation can show
-          setShowVisualization(visualizationMode === 'algorithm');
-        } else {
-          // For other algorithms (like Dijkstra), show the standard visualization
-          setShowAStarVisualization(false);
-          setShowVisualization(visualizationMode === 'algorithm');
-        }
+        // Set appropriate visualization state based on the current mode
+        // For algorithms like Dijkstra, show the standard visualization
+        setShowVisualization(visualizationMode === 'algorithm');
         
         // Calculate total path cost including delays
         let totalCost = 0;
@@ -489,24 +425,25 @@ const Grid = () => {
           memoryUsage: memoryUsed
         });
       } else {
-        console.log('No path found from', startNode, 'to', endNode);
-        setShortestPath([]);
-        setPerformanceMetrics(prev => ({
-          ...prev,
-          executionTime,
-          visitedNodes: 0,
-          pathCost: 0,
-          algorithmSteps: 0,
-          memoryUsage: memoryUsed
-        }));
+        console.log('No path found or empty path');
+        currentState.setShortestPath([]);
+      }
+      
+      // Always set isPathfinding to false when done
+      setIsPathfinding(false);
+      
+      // For A*, show plane animation only if we're in plane mode
+      if (selectedAlgorithm === 'astar' && result.path && result.path.length > 1 && visualizationMode === 'plane') {
+        setTimeout(() => {
+          setShowVisualization(true);
+        }, 200);
       }
     } catch (error) {
       console.error('Error finding path:', error);
-      setShortestPath([]);
-    } finally {
+      currentState.setShortestPath([]);
       setIsPathfinding(false);
     }
-  }, [selectedAirports, selectedAlgorithm, airports, routes, disabledAirports, getEdgeWeight]);
+  }, [selectedAlgorithm, getCurrentState, graph, routes, airports, edgeDelays, edgeFrequencies]);
 
   // Update container dimensions
   const updateDimensions = useCallback(() => {
@@ -591,7 +528,6 @@ const Grid = () => {
       
       // Force a clean slate for visualization
       setShowVisualization(false);
-      setShowAStarVisualization(false);
       
       // Use a short timeout to ensure state is updated before recalculating
       setTimeout(() => {
@@ -630,7 +566,6 @@ const Grid = () => {
       
       // Force a clean slate for visualization
       setShowVisualization(false);
-      setShowAStarVisualization(false);
       
       // Use a short timeout to ensure state is updated before recalculating
       setTimeout(() => {
@@ -645,9 +580,195 @@ const Grid = () => {
     }
   }, [shortestPath, selectedAirports, findPath]);
 
-  // Handle airport click for selection
-  const handleAirportClick = useCallback((e, airport) => {
+  // Toggle airport edit mode
+  const toggleAirportEditMode = useCallback(() => {
+    setIsAirportEditMode(prev => !prev);
+    setIsEdgeDrawMode(false);
+    // Clear selections when entering/exiting edit mode
+    setSelectedAirports([]);
+    setShortestPath([]);
+    setSelectedAirportsForEdge([]);
+  }, []);
+
+  // Toggle edge draw mode
+  const toggleEdgeDrawMode = useCallback(() => {
+    setIsEdgeDrawMode(prev => !prev);
+    setIsAirportEditMode(false);
+    // Clear selections when entering/exiting edge draw mode
+    setSelectedAirports([]);
+    setShortestPath([]);
+    setSelectedAirportsForEdge([]);
+  }, []);
+
+  // Handle creating a new route between two airports
+  const createRoute = useCallback(async (sourceId, targetId, distance) => {
+    const newRoute = {
+      source: sourceId,
+      target: targetId,
+      distance: distance
+    };
+    
+    const result = await addRoute(newRoute);
+    if (result.success) {
+      console.log('Route created successfully');
+      setSelectedAirportsForEdge([]);
+    } else {
+      console.error('Failed to create route:', result.error);
+      alert(`Failed to create route: ${result.error}`);
+    }
+  }, [addRoute]);
+
+  // Handle reset to original data
+  const handleResetToOriginal = useCallback(async () => {
+    const confirmReset = window.confirm('Reset to original network? This will remove all your custom airports and routes.');
+    if (confirmReset) {
+      const result = await resetToOriginal();
+      if (result.success) {
+        // Clear all edit states
+        setIsAirportEditMode(false);
+        setIsEdgeDrawMode(false);
+        setSelectedAirports([]);
+        setShortestPath([]);
+        setSelectedAirportsForEdge([]);
+        setDisabledAirports(new Set());
+        console.log('Network reset to original state');
+      } else {
+        console.error('Failed to reset:', result.error);
+        alert(`Failed to reset network: ${result.error}`);
+      }
+    }
+  }, [resetToOriginal]);
+
+  // Handle grid click to add new airport (only in edit mode)
+  const handleGridClick = useCallback(async (e) => {
+    // Only work in airport edit mode
+    if (!isAirportEditMode) return;
+    
+    // Only handle clicks on the grid container itself, not on airports or routes
+    const isInteractiveElement = e.target.closest('.airport') || 
+                                e.target.closest('.route-group') || 
+                                e.target.closest('.clickable-route') ||
+                                e.target.tagName === 'line' ||
+                                e.target.tagName === 'circle' ||
+                                e.target.tagName === 'text';
+    
+    if (isInteractiveElement) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    
+    // Convert screen coordinates to grid coordinates
+    const gridCoords = unproject(screenX, screenY, dimensions);
+    
+    // Check if the click is within reasonable bounds
+    if (gridCoords.x < 0 || gridCoords.x > 100 || gridCoords.y < 0 || gridCoords.y > 100) {
+      return;
+    }
+    
+    // Generate a new airport ID (find the highest existing ID and add 1)
+    const maxId = Math.max(...airports.map(a => a.id), 0);
+    const newId = maxId + 1;
+    
+    // Create new airport object
+    const newAirport = {
+      id: newId,
+      name: `New Airport ${newId}`,
+      code: `NA${newId}`,
+      position: {
+        x: Math.round(gridCoords.x * 10) / 10, // Round to 1 decimal place
+        y: Math.round(gridCoords.y * 10) / 10
+      }
+    };
+    
+    console.log('Adding new airport at grid coordinates:', gridCoords, newAirport);
+    
+    // Add the airport using the hook
+    const result = await addAirport(newAirport);
+    
+    if (result.success) {
+      console.log('Airport added successfully');
+    } else {
+      console.error('Failed to add airport:', result.error);
+      alert(`Failed to add airport: ${result.error}`);
+    }
+  }, [isAirportEditMode, isEdgeDrawMode, dimensions, airports, addAirport, removeAirport, selectedAirportsForEdge, createRoute]);
+
+  // Handle airport click for selection or removal
+  const handleAirportClick = useCallback(async (e, airport) => {
     e.stopPropagation();
+    
+    console.log('Airport clicked:', airport, 'Edit mode:', isAirportEditMode);
+    
+    // If in edit mode, handle airport removal
+    if (isAirportEditMode) {
+      const airportIdToRemove = airport.originalId || airport.id;
+      console.log('Attempting to remove airport:', airportIdToRemove);
+      const confirmRemove = window.confirm(`Remove Airport ${airport.id}? This will also remove all connected routes.`);
+      if (confirmRemove) {
+        console.log('User confirmed removal, calling removeAirport...');
+        const result = await removeAirport(airportIdToRemove);
+        console.log('Remove airport result:', result);
+        if (result.success) {
+          console.log('Airport removed successfully');
+        } else {
+          console.error('Failed to remove airport:', result.error);
+          alert(`Failed to remove airport: ${result.error}`);
+        }
+      }
+      return;
+    }
+
+    // If in edge draw mode, handle airport selection for route creation
+    if (isEdgeDrawMode) {
+      const airportId = airport.originalId || airport.id;
+      console.log('Airport selected for edge drawing:', airportId);
+      console.log('Current selectedAirportsForEdge:', selectedAirportsForEdge);
+      console.log('selectedAirportsForEdge.length:', selectedAirportsForEdge.length);
+      
+      if (selectedAirportsForEdge.length === 0) {
+        // First airport selected
+        console.log('Setting first airport:', airportId);
+        setSelectedAirportsForEdge([airportId]);
+        console.log('First airport selected for edge');
+      } else if (selectedAirportsForEdge.length === 1) {
+        // Second airport selected, create route
+        const sourceId = selectedAirportsForEdge[0];
+        const targetId = airportId;
+        
+        console.log('Second airport selected:', targetId);
+        console.log('Source:', sourceId, 'Target:', targetId);
+        
+        if (sourceId === targetId) {
+          alert('Cannot create a route to the same airport');
+          setSelectedAirportsForEdge([]);
+          return;
+        }
+        
+        // Prompt for distance
+        const distance = prompt('Enter the distance for this route (in km):');
+        if (distance === null) {
+          // User cancelled
+          setSelectedAirportsForEdge([]);
+          return;
+        }
+        
+        const distanceNum = parseFloat(distance);
+        if (isNaN(distanceNum) || distanceNum <= 0) {
+          alert('Please enter a valid positive number for distance');
+          setSelectedAirportsForEdge([]);
+          return;
+        }
+        
+        console.log(`Creating route from ${sourceId} to ${targetId} with distance ${distanceNum}`);
+        await createRoute(sourceId, targetId, distanceNum);
+      } else {
+        // Reset if somehow we have more than 1 selected
+        console.log('Resetting selection, too many airports selected');
+        setSelectedAirportsForEdge([airportId]);
+      }
+      return;
+    }
     
     // If right-click, handle airport enable/disable
     if (e.button === 2) {
@@ -658,6 +779,7 @@ const Grid = () => {
     // Don't allow selection if no algorithm is chosen
     if (!selectedAlgorithm) {
       console.log('Please select an algorithm first');
+      showToast('Please select a pathfinding algorithm first', 'warning');
       return;
     }
     
@@ -670,50 +792,71 @@ const Grid = () => {
       }
     };
     
+    const currentState = getCurrentState();
+    
     // If already selected, deselect it
-    const isSelected = selectedAirports.some(a => a.id === airport.id);
+    const isSelected = currentState.selectedAirports.some(a => a.id === airport.id);
     if (isSelected) {
-      setSelectedAirports(prev => prev.filter(a => a.id !== airport.id));
-      setShortestPath([]); // Clear path when deselecting
+      currentState.setSelectedAirports(prev => prev.filter(a => a.id !== airport.id));
+      currentState.setShortestPath([]); // Clear path when deselecting
       return;
     }
     
     // If we already have 2 airports, replace the second one
     let newSelectedAirports;
-    if (selectedAirports.length >= 2) {
-      newSelectedAirports = [selectedAirports[0], airportWithPosition];
+    if (currentState.selectedAirports.length >= 2) {
+      newSelectedAirports = [currentState.selectedAirports[0], airportWithPosition];
     } else {
-      newSelectedAirports = [...selectedAirports, airportWithPosition];
+      newSelectedAirports = [...currentState.selectedAirports, airportWithPosition];
     }
     
     console.log('Setting selected airports:', newSelectedAirports);
-    setSelectedAirports(newSelectedAirports);
+    currentState.setSelectedAirports(newSelectedAirports);
     
     // Clear any existing path immediately
-    setShortestPath([]);
+    currentState.setShortestPath([]);
     
     // If we have 2 airports, find the path in the next render cycle
     if (newSelectedAirports.length === 2) {
       // Use a small timeout to ensure state is updated before finding path
       setTimeout(() => {
         console.log('Finding path between:', newSelectedAirports[0].id, 'and', newSelectedAirports[1].id);
-        findPath();
+        // findPath will be called by useEffect when state changes
       }, 0);
     }
-  }, [selectedAirports, findPath, handleAirportRightClick, shortestPath]);
+  }, [getCurrentState, handleAirportRightClick, isAirportEditMode, isEdgeDrawMode, selectedAirportsForEdge, removeAirport, createRoute]);
   
-  // Run pathfinding when selectedAirports or graph changes
+  // Run pathfinding when algorithm-specific selectedAirports or graph changes
   useEffect(() => {
-    console.log('Selected airports changed:', selectedAirports.map(a => `${a.id} (${a.name})`));
+    if (!selectedAlgorithm) return;
     
-    if (selectedAirports.length === 2) {
+    const currentState = getCurrentState();
+    console.log('Selected airports changed:', currentState.selectedAirports.map(a => `${a.id} (${a.name})`));
+    
+    if (currentState.selectedAirports.length === 2) {
       console.log('Two airports selected, finding path...');
-      findPath();
-    } else {
-      console.log('Not enough airports selected, clearing path');
-      setShortestPath([]);
+      // Auto-trigger pathfinding for both algorithms
+      if (selectedAlgorithm === 'astar') {
+        // For A*, don't auto-switch to plane mode - let user control visualization mode
+        // Add small delay to ensure state is fully updated
+        setTimeout(() => {
+          findPath();
+        }, 100);
+      } else if (selectedAlgorithm === 'dijkstra') {
+        // Dijkstra behavior unchanged
+        setVisualizationMode('plane');
+        setShowVisualization(true);
+        // Add small delay to ensure state is fully updated
+        setTimeout(() => {
+          findPath();
+        }, 100);
+      }
+    } else if (currentState.selectedAirports.length === 0) {
+      console.log('No airports selected, clearing path');
+      currentState.setShortestPath([]);
+      setShowVisualization(false);
     }
-  }, [selectedAirports, findPath, graph]);
+  }, [selectedAlgorithm, selectedAlgorithm === 'astar' ? astarSelectedAirports : selectedAirports, graph]);
   
   // Normalize airport coordinates for rendering
   const normalizedAirports = useMemo(() => {
@@ -853,60 +996,6 @@ const Grid = () => {
     <div className="grid-page">
       {/* Left Panel */}
       <div className="left-panel">
-        <div className="panel-header">
-          <h2>Flight Path Finder</h2>
-        </div>
-        
-        <div className="panel-section">
-          <h3>Airport Network</h3>
-          <div className="info-row">
-            <span>Total Airports:</span>
-            <span className="highlight">{stats.totalAirports}</span>
-          </div>
-          <div className="info-row">
-            <span>Total Routes:</span>
-            <span className="highlight">{stats.totalRoutes}</span>
-          </div>
-        </div>
-
-        <div className="panel-section">
-          <h3>Selection</h3>
-          <div className="info-row">
-            <span>Selected:</span>
-            <span className="highlight">{stats.selectedAirportCount}/2</span>
-          </div>
-          
-          {selectedAirports.length > 0 && (
-            <div className="selected-airports">
-              {selectedAirports.map((airport, index) => (
-                <div key={airport.id} className="selected-airport">
-                  <div className="airport-header">
-                    <span className="airport-index">{index + 1}.</span>
-                    <span className="airport-code">{airport.iata || airport.id}</span>
-                  </div>
-                  <div className="airport-name">{airport.name}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {stats.pathLength > 0 && (
-            <div className="path-info">
-              <div className="info-row">
-                <span>Path Length:</span>
-                <span className="highlight">{stats.pathLength} stops</span>
-              </div>
-              <div className="info-row">
-                <span>Total Distance:</span>
-                <span className="highlight">{stats.totalDistance.toLocaleString()} km</span>
-              </div>
-              <div className="info-row">
-                <span>Total Time:</span>
-                <span className="highlight">{formatTime(stats.totalTime)}</span>
-              </div>
-            </div>
-          )}
-        </div>
         
         <div className="panel-section">
           <div className="algorithm-section">
@@ -915,6 +1004,83 @@ const Grid = () => {
               onAlgorithmChange={handleAlgorithmChange}
             />
           </div>
+        </div>
+        
+        <div className="panel-section">
+          <h3>Selection</h3>
+          <div className="info-row">
+            <span>Selected:</span>
+            <span className="highlight">{stats.selectedAirportCount}/2</span>
+          </div>
+          
+          <div className="selected-airports">
+            {/* Always show 2 slots - fill with selected airports or show skeleton */}
+            {[0, 1].map((slotIndex) => {
+              const airport = getCurrentState().selectedAirports[slotIndex];
+              const isSelected = !!airport;
+              
+              return (
+                <div 
+                  key={`slot-${slotIndex}`} 
+                  className={`selected-airport ${!isSelected ? 'skeleton' : ''}`}
+                >
+                  <div className="airport-header">
+                    <span className="airport-index">{slotIndex + 1}.</span>
+                    <span className="airport-code">
+                      {isSelected ? (airport.iata || airport.id) : '--'}
+                    </span>
+                  </div>
+                  <div className="airport-name">
+                    {isSelected ? `Airport ${airport.id}` : `Select ${slotIndex === 0 ? 'first' : 'second'} airport`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          <div className={`path-info ${stats.pathLength === 0 ? 'skeleton' : ''}`}>
+            <div className="info-row">
+              <span>Path Length:</span>
+              <span className="highlight">
+                {stats.pathLength > 0 ? `${stats.pathLength} stops` : '--'}
+              </span>
+            </div>
+            <div className="info-row">
+              <span>Total Distance:</span>
+              <span className="highlight">
+                {stats.pathLength > 0 ? `${stats.totalDistance.toLocaleString()} km` : '-- km'}
+              </span>
+            </div>
+            <div className="info-row">
+              <span>Total Time:</span>
+              <span className="highlight">
+                {stats.pathLength > 0 ? formatTime(stats.totalTime) : '--'}
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="panel-section">
+          <h3>Network Management</h3>
+          <button 
+            className={`edit-mode-toggle ${isAirportEditMode ? 'active' : ''}`}
+            onClick={toggleAirportEditMode}
+          >
+            {isAirportEditMode ? 'Exit Airport Mode' : 'Add/Remove Airports'}
+          </button>
+          <button 
+            className={`edit-mode-toggle ${isEdgeDrawMode ? 'active' : ''}`}
+            onClick={toggleEdgeDrawMode}
+          >
+            {isEdgeDrawMode ? 'Exit Route Mode' : 'Draw Routes'}
+          </button>
+          <button 
+            className="reset-button"
+            onClick={handleResetToOriginal}
+            title="Reset to original network data"
+          >
+            Reset to Original
+          </button>
         </div>
       </div>
       
@@ -934,7 +1100,7 @@ const Grid = () => {
             onClick={closeSettingsPanel}
           />
         )}
-        <div className="grid-container" ref={containerRef}>
+        <div className="grid-container" ref={containerRef} onClick={handleGridClick}>
           {error ? (
             <div className="error-message">
               <p>Error loading data: {error}</p>
@@ -945,6 +1111,7 @@ const Grid = () => {
             <GraphCanvas 
               airports={normalizedAirports.map(airport => ({
                 ...airport,
+                originalId: airport.id, // Keep original ID for removal
                 id: airport.iata || String(airport.id)
               }))}
               routes={routes.map(route => {
@@ -968,20 +1135,24 @@ const Grid = () => {
               onAirportHover={handleAirportHover}
               onAirportClick={handleAirportClick}
               onAirportRightClick={handleAirportRightClick}
-              highlightedPath={visualizationMode === 'plane' ? shortestPath : []}
-              selectedAirports={selectedAirports}
-              disabledAirports={disabledAirports}
+              highlightedPath={visualizationMode === 'plane' ? getCurrentState().shortestPath : []}
+              selectedAirports={getCurrentState().selectedAirports}
+              disabledAirports={getCurrentState().disabledAirports}
+              showHeuristics={selectedAlgorithm === 'astar' && getCurrentState().selectedAirports.length === 2}
               edgeDelays={edgeDelays}
               onEdgeDelayChange={handleEdgeDelayChange}
               onEdgeFrequencyChange={handleEdgeFrequencyChange}
               selectedAlgorithm={selectedAlgorithm} // Pass selectedAlgorithm prop
               visualizationMode={visualizationMode}
+              isAirportEditMode={isAirportEditMode}
+              isEdgeDrawMode={isEdgeDrawMode}
+              selectedAirportsForEdge={selectedAirportsForEdge}
             />
             
             {/* Plane Animation - Only show when there's a valid path and in plane visualization mode */}
-            {shortestPath.length > 1 && visualizationMode === 'plane' && (
+            {getCurrentState().shortestPath.length > 1 && visualizationMode === 'plane' && (
               <div 
-                key={`plane-animation-${shortestPath.join('-')}`}
+                key={`plane-animation-${getCurrentState().shortestPath.join('-')}`}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -993,8 +1164,8 @@ const Grid = () => {
                 }}
               >
                 <PlaneAnimation
-                  key={`plane-${shortestPath.join('-')}`}
-                  path={shortestPath}
+                  key={`plane-${getCurrentState().shortestPath.join('-')}`}
+                  path={getCurrentState().shortestPath}
                   airports={normalizedAirports}
                   speed={2}
                   isPlaying={true}
@@ -1005,59 +1176,8 @@ const Grid = () => {
               </div>
             )}
             
-            {/* A* Visualization - Only shown when toggled on */}
-            {console.log('A* Visualization render check:', {
-              selectedAlgorithm,
-              showAStarVisualization,
-              showVisualization,
-              selectedAirportsCount: selectedAirports.length,
-              visualizationMode,
-              rendering: selectedAlgorithm === 'astar' && showVisualization && visualizationMode === 'algorithm' && selectedAirports.length === 2,
-              conditions: {
-                isAStar: selectedAlgorithm === 'astar',
-                hasTwoAirports: selectedAirports.length === 2,
-                showVisualization,
-                visualizationMode,
-                shouldRender: selectedAlgorithm === 'astar' && showVisualization && visualizationMode === 'algorithm' && selectedAirports.length === 2
-              }
-            })}
-            {selectedAlgorithm === 'astar' && showVisualization && visualizationMode === 'algorithm' && selectedAirports.length === 2 && (
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                pointerEvents: 'auto', // Changed to allow interaction with controls
-                zIndex: 6 // Higher than GraphCanvas
-              }}>
-                <SimpleAStarVisualization 
-                  key={`astar-${selectedAirports[0]?.id}-${selectedAirports[1]?.id}`}
-                  startPoint={{
-                    x: selectedAirports[0].x * 100 / dimensions.width,
-                    y: selectedAirports[0].y * 100 / dimensions.height
-                  }}
-                  endPoint={{
-                    x: selectedAirports[1].x * 100 / dimensions.width,
-                    y: selectedAirports[1].y * 100 / dimensions.height
-                  }}
-                  dimensions={dimensions}
-                  nodeCount={30}
-                  speed={performanceMetrics?.executionTime > 50 ? 50 : 100} // Adjust speed based on path complexity
-                  onComplete={() => {
-                    console.log('A* visualization complete');
-                    // Optionally update performance metrics or visualization state
-                    setPerformanceMetrics(prev => ({
-                      ...prev,
-                      visualizationComplete: true
-                    }));
-                  }}
-                />
-              </div>
-            )}
-            
-            {/* Animation Container - For Dijkstra's Visualization */}
-            {selectedAlgorithm !== 'astar' && (
+            {/* Animation Container - For Algorithm Visualization */}
+            {(
               <div style={{
                 position: 'absolute',
                 top: 0,
@@ -1066,12 +1186,12 @@ const Grid = () => {
                 height: '100%',
                 pointerEvents: 'none',
                 zIndex: 5,
-                display: shortestPath.length > 1 ? 'block' : 'none'
+                display: getCurrentState().shortestPath.length > 1 ? 'block' : 'none'
               }}>
                 {visualizationMode === 'plane' ? (
                   <PlaneAnimation
-                    key={`plane-${shortestPath.join('-')}`}
-                    path={shortestPath}
+                    key={`plane-${getCurrentState().shortestPath.join('-')}`}
+                    path={getCurrentState().shortestPath}
                     airports={normalizedAirports}
                     speed={2}
                     isPlaying={true}
@@ -1079,19 +1199,34 @@ const Grid = () => {
                       console.log('Plane animation completed');
                     }}
                   />
-                ) : selectedAirports.length === 2 && shortestPath.length > 1 ? (
-                  <AlgorithmVisualization
-                    key={`algo-${shortestPath.join('-')}`}
-                    path={shortestPath}
-                    airports={normalizedAirports}
-                    routes={routes}
-                    graph={graph}
-                    startNode={String(selectedAirports[0].id)}
-                    endNode={String(selectedAirports[1].id)}
-                    onComplete={() => {
-                      console.log('Algorithm visualization completed');
-                    }}
-                  />
+                ) : getCurrentState().selectedAirports.length === 2 && getCurrentState().shortestPath.length > 1 ? (
+                  selectedAlgorithm === 'astar' ? (
+                    <AStarVisualization
+                      key={`astar-${getCurrentState().shortestPath.join('-')}`}
+                      path={getCurrentState().shortestPath}
+                      airports={normalizedAirports}
+                      routes={routes}
+                      graph={graph}
+                      startNode={String(getCurrentState().selectedAirports[0].id)}
+                      endNode={String(getCurrentState().selectedAirports[1].id)}
+                      onComplete={() => {
+                        console.log('A* visualization completed');
+                      }}
+                    />
+                  ) : (
+                    <AlgorithmVisualization
+                      key={`algo-${getCurrentState().shortestPath.join('-')}`}
+                      path={getCurrentState().shortestPath}
+                      airports={normalizedAirports}
+                      routes={routes}
+                      graph={graph}
+                      startNode={String(getCurrentState().selectedAirports[0].id)}
+                      endNode={String(getCurrentState().selectedAirports[1].id)}
+                      onComplete={() => {
+                        console.log('Dijkstra visualization completed');
+                      }}
+                    />
+                  )
                 ) : (
                   <div style={{
                     position: 'absolute',
@@ -1116,6 +1251,16 @@ const Grid = () => {
               airport={tooltip.airport}
             />
             
+            {/* Toast Notifications */}
+            {toasts.map(toast => (
+              <Toast
+                key={toast.id}
+                message={toast.message}
+                type={toast.type}
+                duration={toast.duration}
+                onClose={() => removeToast(toast.id)}
+              />
+            ))}
 
           </>
         )}

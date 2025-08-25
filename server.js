@@ -73,9 +73,36 @@ const handleShortestPath = (req, res) => {
     });
 };
 
+// Handle saving updated graph data
+const handleSaveGraph = async (req, res) => {
+    try {
+        const { airports, routes } = req.body;
+        
+        if (!airports || !routes) {
+            return res.status(400).json({ error: "Airports and routes data are required" });
+        }
+
+        const graphData = { airports, routes };
+        
+        console.log('Saving updated graph data...');
+        await fs.promises.writeFile(GRAPH_FILE, JSON.stringify(graphData, null, 2));
+        
+        console.log('Graph data saved successfully');
+        res.json({ success: true, message: "Graph data saved successfully" });
+    } catch (error) {
+        console.error('Error saving graph data:', error);
+        res.status(500).json({ 
+            error: "Error saving graph data",
+            details: error.message
+        });
+    }
+};
+
 // Register the endpoint at both paths for compatibility
 app.post("/api/shortest-path", handleShortestPath);
 app.post("/shortest-path", handleShortestPath);
+app.post("/api/save-graph", handleSaveGraph);
+app.post("/save-graph", handleSaveGraph);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

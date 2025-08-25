@@ -23,7 +23,7 @@ const Tooltip = ({ visible, x, y, airport }) => {
       }}
     >
       <div className="tooltip-header">
-        <h4 className="tooltip-title">{airport.name || 'Unknown Airport'}</h4>
+        <h4 className="tooltip-title">{`Airport ${airport.id}`}</h4>
         {airport.id && <span className="tooltip-code">Code: {airport.id}</span>}
       </div>
       
@@ -32,7 +32,7 @@ const Tooltip = ({ visible, x, y, airport }) => {
           <div className="tooltip-row">
             <span className="tooltip-label">Location:</span>
             <span className="tooltip-value">
-              {[airport.city, airport.country].filter(Boolean).join(', ')}
+              {}
             </span>
           </div>
         ) : null}

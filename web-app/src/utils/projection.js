@@ -29,6 +29,37 @@ export const project = (x, y, dimensions) => {
 };
 
 /**
+ * Converts screen coordinates back to grid coordinates (inverse of project)
+ * @param {number} screenX - Screen X coordinate
+ * @param {number} screenY - Screen Y coordinate
+ * @param {Object} dimensions - Container dimensions {width, height}
+ * @returns {Object} Grid coordinates {x, y} (0-100 range)
+ */
+export const unproject = (screenX, screenY, dimensions) => {
+  // Use the same parameters as project function
+  const margin = 0.2;
+  const marginX = dimensions.width * margin;
+  const marginY = dimensions.height * margin;
+  const scaleFactor = 1.5;
+  
+  const scaleX = ((dimensions.width - 2 * marginX) / 100) * scaleFactor;
+  const scaleY = ((dimensions.height - 2 * marginY) / 100) * scaleFactor;
+  
+  const offsetX = (dimensions.width - (100 * scaleX)) / 2;
+  const offsetY = (dimensions.height - (100 * scaleY)) / 2;
+  
+  // Reverse the projection calculation
+  const gridX = (screenX - offsetX) / scaleX;
+  const gridY = (screenY - offsetY) / scaleY;
+  
+  // Clamp to 0-100 range
+  return {
+    x: Math.max(0, Math.min(100, gridX)),
+    y: Math.max(0, Math.min(100, gridY))
+  };
+};
+
+/**
  * Normalizes coordinates to fit within the container
  * @param {Array} coordinates - Array of {position: {x, y}} objects
  * @param {Object} dimensions - Container dimensions {width, height}

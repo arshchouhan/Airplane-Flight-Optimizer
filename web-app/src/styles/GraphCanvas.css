@@ -253,7 +253,7 @@
   cursor: pointer;
   z-index: 20;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
+  transition: all 0.5s ease-in-out;
   color: white;
   pointer-events: auto;
 }
@@ -298,10 +298,11 @@
 }
 
 .airport.disabled {
-  background-color: #757575;
-  border-color: #9E9E9E;
+  background-color: #757575 !important;
+  border-color: #9E9E9E !important;
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.3 !important;
+  transition: all 0.5s ease-in-out !important;
 }
 
 /* Airport Tooltip */
@@ -509,6 +510,74 @@
 
 .airport-enter {
   animation: popIn 0.3s ease-out forwards;
+}
+
+/* Edit Mode Styles */
+.graph-canvas.edit-mode {
+  cursor: crosshair;
+}
+
+.graph-canvas.edit-mode .airport {
+  cursor: pointer;
+  border: 3px solid #ef4444;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  transform: scale(1.05);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.graph-canvas.edit-mode .airport:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.5), 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.graph-canvas.edit-mode .route {
+  opacity: 0.3;
+  filter: blur(1px);
+}
+
+.graph-canvas.edit-mode .route-label {
+  opacity: 0.3;
+}
+
+.graph-canvas.edit-mode .frequency-indicator {
+  opacity: 0.3;
+}
+
+/* Edge Draw Mode Styles */
+.graph-canvas.edge-draw-mode {
+  cursor: crosshair;
+}
+
+.graph-canvas.edge-draw-mode .airport {
+  cursor: pointer;
+  border: 3px solid #10b981;
+  background: linear-gradient(135deg, #10b981, #059669);
+  transform: scale(1.05);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.graph-canvas.edge-draw-mode .airport:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.5), 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.airport.selected-for-edge {
+  border: 3px solid #f59e0b !important;
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.5), 0 6px 16px rgba(0, 0, 0, 0.25) !important;
+  animation: pulse-orange 1.5s infinite;
+}
+
+@keyframes pulse-orange {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
 }
 
 /* Responsive adjustments */

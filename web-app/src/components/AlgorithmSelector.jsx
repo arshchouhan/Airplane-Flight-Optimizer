@@ -2,10 +2,25 @@ import React from 'react';
 import '../styles/AlgorithmSelector.css';
 
 const algorithms = [
-  { id: 'dijkstra', name: 'Start Pathfinding' }
+  { id: 'dijkstra', name: 'Dijkstra' },
+  { id: 'astar', name: 'A*' }
 ];
 
 const AlgorithmSelector = ({ selectedAlgorithm, onAlgorithmChange }) => {
+  const handleDoubleClick = (algo) => {
+    if (selectedAlgorithm === algo.id) {
+      // Only trigger panel on double-click of selected algorithm
+      onAlgorithmChange(algo.id, true); // Pass true for isDoubleClick
+    }
+  };
+
+  const handleSingleClick = (algo) => {
+    // Only change selection, don't trigger panel
+    if (selectedAlgorithm !== algo.id) {
+      onAlgorithmChange(algo.id, false); // Pass false for isDoubleClick
+    }
+  };
+
   return (
     <div className="algorithm-selector">
       <h3>Pathfinding <span className="required">*</span></h3>
@@ -14,34 +29,20 @@ const AlgorithmSelector = ({ selectedAlgorithm, onAlgorithmChange }) => {
           <label 
             key={algo.id} 
             className={`algorithm-option ${!selectedAlgorithm ? 'unselected' : ''}`}
-            onClick={(e) => {
-              if (selectedAlgorithm === algo.id) {
-                e.preventDefault();
-                onAlgorithmChange(algo.id);
-              }
-            }}
+            onClick={() => handleSingleClick(algo)}
+            onDoubleClick={() => handleDoubleClick(algo)}
           >
             <input
               type="radio"
               name="pathfinding-algorithm"
               value={algo.id}
               checked={selectedAlgorithm === algo.id}
-              onChange={() => onAlgorithmChange(algo.id)}
+              onChange={() => {}} // Prevent default onChange
               required
-              onClick={(e) => e.stopPropagation()}
             />
             <span>{algo.name}</span>
           </label>
         ))}
-        <div className="instructions">
-          <p>How to use:</p>
-          <ol>
-            <li>Select two airports on the map</li>
-            <li>Click "Start Pathfinding" to find the shortest route</li>
-            <li>Watch the animation to see the path being discovered</li>
-          </ol>
-          <p className="note">Tip: Click on any airport to see flight information</p>
-        </div>
       </div>
     </div>
   );

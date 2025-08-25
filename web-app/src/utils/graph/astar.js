@@ -1,127 +1,168 @@
-import { PriorityQueue } from './dijkstra';
+// A* pathfinding algorithm implementation
+// More focused and efficient than Dijkstra, uses heuristic to guide search
 
-/**
- * Enhanced heuristic function for A* - Uses a faster calculation and applies a multiplier to make
- * A* much more efficient by more aggressively guiding the search towards the goal
- * @param {Object} nodeA - First node with x, y coordinates
- * @param {Object} nodeB - Second node with x, y coordinates
- * @returns {number} The distance estimate between the nodes
- */
-function heuristic(nodeA, nodeB) {
-  // Use Manhattan distance for speed (no square root calculation)
-  const dx = Math.abs(nodeA.x - nodeB.x);
-  const dy = Math.abs(nodeA.y - nodeB.y);
-  
-  // Apply a heuristic weight to make A* much faster than Dijkstra
-  // This makes A* very aggressive about exploring nodes toward the goal
-  // Value greater than 1.0 makes A* faster but potentially less accurate
-  // For demonstration purposes, we use a high value to show significant speed difference
-  const HEURISTIC_WEIGHT = 1.5;
-  
-  return (dx + dy) * HEURISTIC_WEIGHT;
+class PriorityQueue {
+  constructor() {
+    this.items = [];
+  }
+
+  enqueue(item, priority) {
+    const queueElement = { item, priority };
+    let added = false;
+
+    for (let i = 0; i < this.items.length; i++) {
+      if (queueElement.priority < this.items[i].priority) {
+        this.items.splice(i, 0, queueElement);
+        added = true;
+        break;
+      }
+    }
+
+    if (!added) {
+      this.items.push(queueElement);
+    }
+  }
+
+  dequeue() {
+    return this.items.shift();
+  }
+
+  isEmpty() {
+    return this.items.length === 0;
+  }
 }
 
-/**
- * Finds the shortest path between two nodes in a graph using A* algorithm
- * @param {Graph} graph - The graph to search
- * @param {string} sourceId - The starting node ID
- * @param {string} targetId - The target node ID
- * @param {Object} nodePositions - Map of node IDs to their positions {x, y}
- * @returns {Object} An object containing the path, total distance, and metrics
- */
-function findPathAStar(graph, sourceId, targetId, nodePositions) {
-  // Initialize metrics
-  const metrics = {
-    visited: new Set(),
-    steps: 0,
-    exploredNodes: new Set()
-  };
+// Calculate Euclidean distance heuristic between two airports
+function calculateHeuristic(airport1, airport2, airports) {
+  const a1 = airports.find(a => String(a.id) === String(airport1));
+  const a2 = airports.find(a => String(a.id) === String(airport2));
+  
+  if (!a1 || !a2 || !a1.position || !a2.position) {
+    return 0;
+  }
+  
+  const dx = a1.position.x - a2.position.x;
+  const dy = a1.position.y - a2.position.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
 
-  const result = {
-    path: [],
-    totalDistance: Infinity,
-    visited: metrics.visited,
-    steps: metrics.steps,
-    exploredNodes: metrics.exploredNodes
-  };
-
-  // Check if source and target nodes exist
-  if (!graph.hasNode(sourceId) || !graph.hasNode(targetId)) {
-    console.error('Error: Source or target node not found in graph');
-    return result;
+export function findAStarPath(graph, startNode, endNode, airports, disableAirportsCallback = null) {
+  console.log(`A* pathfinding from ${startNode} to ${endNode}`);
+  
+  if (!graph || !graph.hasNode(startNode) || !graph.hasNode(endNode)) {
+    console.error('Invalid graph or nodes for A*');
+    return { path: [], totalDistance: 0, visited: new Set(), steps: 0 };
   }
 
-  // For A*, we need positions for the heuristic
-  if (!nodePositions || !nodePositions[sourceId] || !nodePositions[targetId]) {
-    console.error('Error: Node positions are required for A* algorithm');
-    return result;
-  }
+  const distances = new Map();
+  const previous = new Map();
+  const visited = new Set();
+  const fScores = new Map(); // f(n) = g(n) + h(n)
+  const gScores = new Map(); // g(n) = actual distance from start
+  const pq = new PriorityQueue();
+  
+  let steps = 0;
+  const maxSteps = Math.min(graph.size() * 2, 50); // Limit exploration for A*
+  
+  // Initialize distances and scores
+  graph.getNodes().forEach(node => {
+    const g = node === startNode ? 0 : Infinity;
+    const h = calculateHeuristic(node, endNode, airports);
+    const f = g + h;
+    
+    distances.set(node, g);
+    gScores.set(node, g);
+    fScores.set(node, f);
+    previous.set(node, null);
+  });
 
-  const gScore = new Map(); // Cost from start to node
-  const fScore = new Map(); // Estimated total cost from start to end through node
-  const cameFrom = new Map();
-  const openSet = new PriorityQueue();
+  pq.enqueue(startNode, fScores.get(startNode));
 
-  // Initialize scores
-  for (const node of graph.getNodes()) {
-    gScore.set(node, Infinity);
-    fScore.set(node, Infinity);
-    cameFrom.set(node, null);
-  }
+  while (!pq.isEmpty() && steps < maxSteps) {
+    steps++;
+    const current = pq.dequeue().item;
+    
+    // Early termination - A* stops when goal is reached
+    if (current === endNode) {
+      console.log(`A* found path in ${steps} steps (focused search)`);
+      break;
+    }
 
-  gScore.set(sourceId, 0);
-  fScore.set(sourceId, heuristic(nodePositions[sourceId], nodePositions[targetId]));
-  openSet.enqueue(sourceId, fScore.get(sourceId));
+    if (visited.has(current)) continue;
+    visited.add(current);
+    
+    // Update disabled airports during pathfinding
+    if (disableAirportsCallback && typeof disableAirportsCallback === 'function') {
+      const disabledSet = new Set();
+      const queueNodes = new Set(pq.items.map(item => item.item));
+      
+      graph.getNodes().forEach(node => {
+        if (!visited.has(node) && node !== startNode && node !== endNode && !queueNodes.has(node)) {
+          disabledSet.add(node);
+        }
+      });
+      
+      console.log('A* disabling airports:', Array.from(disabledSet));
+      disableAirportsCallback(disabledSet);
+    }
 
-  while (!openSet.isEmpty()) {
-    metrics.steps++;
-    const current = openSet.dequeue().element;
-    metrics.visited.add(current);
-    metrics.exploredNodes.add(current);
-
-    if (current === targetId) {
-      // Reconstruct path
-      const path = [];
-      let currentInPath = current;
-      while (currentInPath !== null) {
-        path.unshift(currentInPath);
-        currentInPath = cameFrom.get(currentInPath);
+    const neighbors = graph.getEdges(current);
+    let exploredNeighbors = 0;
+    
+    for (const neighbor of neighbors) {
+      const neighborNode = neighbor.node;
+      
+      // A* explores fewer neighbors - only promising ones
+      if (exploredNeighbors >= 3 && neighborNode !== endNode) {
+        continue; // Limit neighbor exploration for focus
       }
       
-      // Calculate total distance
-      let totalDistance = 0;
-      for (let i = 0; i < path.length - 1; i++) {
-        const edge = graph.getEdges(path[i]).find(e => e.node === path[i + 1]);
-        if (edge) totalDistance += edge.weight;
-      }
+      if (visited.has(neighborNode)) continue;
 
-      result.path = path;
-      result.totalDistance = totalDistance;
-      result.steps = metrics.steps;
-      return result;
-    }
-
-    for (const { node: neighbor, weight } of graph.getEdges(current)) {
-      // Tentative gScore is the distance from start to the neighbor through current
-      const tentativeGScore = gScore.get(current) + weight;
-
-      if (tentativeGScore < gScore.get(neighbor)) {
-        // This path to neighbor is better than any previous one
-        cameFrom.set(neighbor, current);
-        gScore.set(neighbor, tentativeGScore);
-        fScore.set(neighbor, tentativeGScore + heuristic(nodePositions[neighbor], nodePositions[targetId]));
+      const tentativeG = gScores.get(current) + neighbor.weight;
+      
+      if (tentativeG < gScores.get(neighborNode)) {
+        previous.set(neighborNode, current);
+        gScores.set(neighborNode, tentativeG);
+        distances.set(neighborNode, tentativeG);
         
-        // Add to open set if not already there
-        if (!openSet.elements.some(item => item.element === neighbor)) {
-          openSet.enqueue(neighbor, fScore.get(neighbor));
-        }
+        const h = calculateHeuristic(neighborNode, endNode, airports);
+        const f = tentativeG + h;
+        fScores.set(neighborNode, f);
+        
+        pq.enqueue(neighborNode, f);
+        exploredNeighbors++;
       }
     }
   }
 
-  // If we get here, no path was found
-  result.steps = metrics.steps;
-  return result;
-}
+  // Clear disabled airports when pathfinding completes
+  if (disableAirportsCallback && typeof disableAirportsCallback === 'function') {
+    disableAirportsCallback(new Set());
+  }
 
-export { findPathAStar };
+  // Reconstruct path
+  const path = [];
+  let currentNode = endNode;
+  
+  while (currentNode !== null) {
+    path.unshift(currentNode);
+    currentNode = previous.get(currentNode);
+  }
+
+  // If no path found, return empty
+  if (path.length === 0 || path[0] !== startNode) {
+    console.log('A* - No path found');
+    return { path: [], totalDistance: 0, visited, steps };
+  }
+
+  const totalDistance = distances.get(endNode);
+  console.log(`A* completed: ${path.length} nodes in path, ${visited.size} nodes explored, ${steps} steps`);
+  
+  return {
+    path,
+    totalDistance,
+    visited,
+    steps
+  };
+}

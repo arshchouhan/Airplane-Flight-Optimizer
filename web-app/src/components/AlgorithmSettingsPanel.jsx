@@ -32,6 +32,12 @@ const AlgorithmSettingsPanel = ({ algorithm, isVisible, onClose, performanceMetr
             <p>Finds the shortest path from source to all nodes</p>
           </div>
         );
+      case 'astar':
+        return (
+          <div className="algorithm-settings">
+            <p>Uses heuristics to find the shortest path more efficiently than Dijkstra</p>
+          </div>
+        );
       case 'bellman-ford':
         return (
           <div className="algorithm-settings">
@@ -56,7 +62,8 @@ const AlgorithmSettingsPanel = ({ algorithm, isVisible, onClose, performanceMetr
   return (
     <div className={`algorithm-settings-panel ${isVisible ? 'is-visible' : ''}`}>
       <div className="panel-header">
-        <h3>{algorithm === 'dijkstra' ? "Start Pathfinding" : 
+        <h3>{algorithm === 'dijkstra' ? "Dijkstra" : 
+             algorithm === 'astar' ? 'A*' : 
              algorithm === 'bellman-ford' ? 'Bellman-Ford' : 
              'Floyd-Warshall'} Algorithm</h3>
         <button className="close-btn" onClick={onClose}>×</button>
