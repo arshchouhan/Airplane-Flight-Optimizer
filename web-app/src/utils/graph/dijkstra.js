@@ -24,7 +24,7 @@ class PriorityQueue {
  * @param {string} targetId - The target node ID
  * @returns {Object} An object containing the path and total distance
  */
-function findShortestPath(graph, sourceId, targetId) {
+function findShortestPath(graph, sourceId, targetId, edgeDelays = {}, edgeDistances = {}, edgeFrequencies = {}) {
   // Initialize metrics
   const metrics = {
     visited: new Set(),
@@ -74,7 +74,31 @@ function findShortestPath(graph, sourceId, targetId) {
 
     // Check all neighbors
     for (const { node: neighbor, weight } of graph.getEdges(currentId)) {
-      const distance = currentDistance + weight;
+      // Get the edge ID for custom distance lookup
+      const edgeId = `${currentId}-${neighbor}`;
+      const reverseEdgeId = `${neighbor}-${currentId}`;
+      
+      // Use custom distance if available, otherwise use original weight
+      let edgeWeight = weight;
+      const customDistance = edgeDistances[edgeId] || edgeDistances[reverseEdgeId];
+      if (customDistance !== undefined) {
+        edgeWeight = customDistance;
+      }
+      
+      // Add delay if present
+      const delay = edgeDelays[edgeId] || edgeDelays[reverseEdgeId] || 0;
+      if (delay > 0) {
+        edgeWeight += delay * 10; // Convert delay minutes to distance penalty
+      }
+      
+      // Apply frequency override - if frequency >= 5, use weight of 1
+      const frequency = edgeFrequencies[edgeId] || edgeFrequencies[reverseEdgeId] || 1;
+      if (frequency >= 5) {
+        edgeWeight = 1; // Ultra high frequency gets priority weight
+        console.log(`🚨 DIJKSTRA FREQUENCY OVERRIDE: Edge ${edgeId} with frequency ${frequency} gets weight 1`);
+      }
+
+      const distance = currentDistance + edgeWeight;
 
       // If we found a shorter path to the neighbor
       if (distance < distances.get(neighbor)) {

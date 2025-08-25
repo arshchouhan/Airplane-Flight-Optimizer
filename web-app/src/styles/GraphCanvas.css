@@ -12,6 +12,7 @@
   background-position: -1px -1px;
 }
 
+
 /* Routes layer */
 .routes-layer {
   position: absolute;
@@ -24,24 +25,108 @@
   z-index: 1;
 }
 
+/* Custom distance highlighting */
+.custom-distance-bg {
+  fill: rgba(34, 197, 94, 0.9) !important; /* Bright green background */
+  stroke: #16a34a;
+  stroke-width: 2px;
+}
+
+.custom-distance-text {
+  fill: #ffffff !important; /* White text for high contrast */
+  font-weight: bold;
+  text-shadow: 0 0 6px rgba(34, 197, 94, 0.8);
+}
+
+/* Business level indicators */
+.business-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.crow {
+  position: absolute;
+  font-size: 8px;
+  color: #fbbf24;
+  animation: fly-around 3s infinite linear;
+  opacity: 0.8;
+}
+
+.crow-1 { animation-delay: 0s; }
+.crow-2 { animation-delay: 0.5s; }
+.crow-3 { animation-delay: 1s; }
+.crow-4 { animation-delay: 1.5s; }
+.crow-5 { animation-delay: 2s; }
+.crow-6 { animation-delay: 2.5s; }
+
+@keyframes fly-around {
+  0% {
+    transform: translate(0px, 0px) rotate(0deg);
+    opacity: 0.8;
+  }
+  25% {
+    transform: translate(15px, -10px) rotate(90deg);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(0px, -20px) rotate(180deg);
+    opacity: 0.8;
+  }
+  75% {
+    transform: translate(-15px, -10px) rotate(270deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0px, 0px) rotate(360deg);
+    opacity: 0.8;
+  }
+}
+
+.moderate .crow {
+  animation-duration: 4s;
+}
+
+.busy .crow {
+  animation-duration: 2.5s;
+  font-size: 10px;
+}
+
+.very-busy .crow {
+  animation-duration: 1.5s;
+  font-size: 12px;
+  color: #f87171;
+}
+
 /* Delay severity styles */
 .delay-low {
   stroke: #60a5fa; /* Blue */
   stroke-dasharray: 8, 4;
   animation: dash-animation 2s linear infinite;
+  stroke-width: 4px !important;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 2px #60a5fa);
 }
 
 .delay-medium {
   stroke: #fbbf24; /* Yellow */
   stroke-dasharray: 6, 3;
   animation: dash-animation 1.5s linear infinite;
+  stroke-width: 5px !important;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 3px #fbbf24);
 }
 
 .delay-high {
   stroke: #f87171; /* Red */
   stroke-dasharray: 4, 2;
   animation: dash-animation 1s linear infinite;
-  stroke-width: 8px !important;
+  stroke-width: 6px !important;
+  opacity: 0.95;
+  filter: drop-shadow(0 0 4px #f87171);
 }
 
 @keyframes dash-animation {
@@ -75,17 +160,24 @@
 
 /* Route distance label */
 .route-label {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   fill: #f8fafc;
-  text-shadow: 
-    -1px -1px 3px #0f172a,
-    1px -1px 3px #0f172a,
-    -1px 1px 3px #0f172a,
-    1px 1px 3px #0f172a;
-  pointer-events: none;
+  stroke: none;
   user-select: none;
-  transition: all 0.2s ease;
+  pointer-events: none;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}
+
+.route-label-bg {
+  font-size: 13px;
+  font-weight: 700;
+  fill: none;
+  stroke: #0f172a;
+  stroke-width: 4;
+  user-select: none;
+  pointer-events: none;
+  opacity: 0.9;
 }
 
 /* Frequency indicator styles */
@@ -97,14 +189,12 @@
 }
 
 .frequency-text {
-  font-size: 9px;
-  fill: #cbd5e1;
-  text-shadow: 
-    -1px -1px 2px #0f172a,
-    1px -1px 2px #0f172a,
-    -1px 1px 2px #0f172a,
-    1px 1px 2px #0f172a;
-  transition: all 0.2s ease;
+  font-size: 12px;
+  font-weight: 600;
+  fill: #94a3b8;
+  user-select: none;
+  pointer-events: none;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.7);
 }
 
 /* Frequency level colors */
@@ -126,9 +216,11 @@
   animation: pulse-red 1.5s infinite;
 }
 
-.frequency-indicator.has-delay .frequency-text {
-  fill: #ef4444;
-  font-weight: bold;
+.frequency-indicator.has-delay .frequency-text.has-delay {
+  fill: #f87171;
+  font-weight: 700;
+  font-size: 13px;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
 }
 
 .frequency-indicator.has-delay circle {
@@ -217,12 +309,28 @@
 }
 
 .route.highlighted {
-  stroke: #4ECDC4; /* Bright teal */
+  stroke: #3B82F6; /* Blue */
   stroke-width: 8px;
   stroke-dasharray: none;
-  filter: drop-shadow(0 0 10px rgba(78, 205, 196, 0.6));
+  filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.6));
   animation: pulse 1.5s infinite ease-in-out;
   opacity: 1;
+}
+
+/* Reverse traversal highlight (e.g., when plane backtracks a segment) */
+.route.highlighted-reverse {
+  stroke: #3B82F6; /* Blue */
+  stroke-width: 8px;
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.6));
+  animation: pulse 1.5s infinite ease-in-out;
+  opacity: 1;
+}
+
+/* Keep reverse highlight visible during visualization fade */
+.route.highlighted-reverse.faded {
+  opacity: 1;
+  stroke: #3B82F6;
 }
 
 /* Airports layer */

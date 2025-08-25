@@ -32,21 +32,37 @@ class PriorityQueue {
   }
 }
 
-// Calculate Euclidean distance heuristic between two airports
+// Calculate great-circle (haversine) distance heuristic in kilometers
 function calculateHeuristic(airport1, airport2, airports) {
   const a1 = airports.find(a => String(a.id) === String(airport1));
   const a2 = airports.find(a => String(a.id) === String(airport2));
-  
-  if (!a1 || !a2 || !a1.position || !a2.position) {
+
+  if (!a1 || !a2) return 0;
+
+  const lat1 = a1.latitude ?? a1.position?.lat;
+  const lon1 = a1.longitude ?? a1.position?.lon;
+  const lat2 = a2.latitude ?? a2.position?.lat;
+  const lon2 = a2.longitude ?? a2.position?.lon;
+
+  if (
+    typeof lat1 !== 'number' || typeof lon1 !== 'number' ||
+    typeof lat2 !== 'number' || typeof lon2 !== 'number'
+  ) {
     return 0;
   }
-  
-  const dx = a1.position.x - a2.position.x;
-  const dy = a1.position.y - a2.position.y;
-  return Math.sqrt(dx * dx + dy * dy);
+
+  const R = 6371; // Earth radius in km
+  const toRad = d => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const s1 = Math.sin(dLat / 2);
+  const s2 = Math.sin(dLon / 2);
+  const a = s1 * s1 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * s2 * s2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // km
 }
 
-export function findAStarPath(graph, startNode, endNode, airports, disableAirportsCallback = null) {
+export function findAStarPath(graph, startNode, endNode, airports, disableAirportsCallback = null, edgeDelays = {}, edgeDistances = {}, edgeFrequencies = {}) {
   console.log(`A* pathfinding from ${startNode} to ${endNode}`);
   
   if (!graph || !graph.hasNode(startNode) || !graph.hasNode(endNode)) {
@@ -62,7 +78,6 @@ export function findAStarPath(graph, startNode, endNode, airports, disableAirpor
   const pq = new PriorityQueue();
   
   let steps = 0;
-  const maxSteps = Math.min(graph.size() * 2, 50); // Limit exploration for A*
   
   // Initialize distances and scores
   graph.getNodes().forEach(node => {
@@ -78,7 +93,7 @@ export function findAStarPath(graph, startNode, endNode, airports, disableAirpor
 
   pq.enqueue(startNode, fScores.get(startNode));
 
-  while (!pq.isEmpty() && steps < maxSteps) {
+  while (!pq.isEmpty()) {
     steps++;
     const current = pq.dequeue().item;
     
@@ -107,19 +122,44 @@ export function findAStarPath(graph, startNode, endNode, airports, disableAirpor
     }
 
     const neighbors = graph.getEdges(current);
-    let exploredNeighbors = 0;
     
     for (const neighbor of neighbors) {
       const neighborNode = neighbor.node;
       
-      // A* explores fewer neighbors - only promising ones
-      if (exploredNeighbors >= 3 && neighborNode !== endNode) {
-        continue; // Limit neighbor exploration for focus
-      }
-      
       if (visited.has(neighborNode)) continue;
 
-      const tentativeG = gScores.get(current) + neighbor.weight;
+      // Get the edge ID for custom distance lookup
+      const edgeId = `${current}-${neighborNode}`;
+      const reverseEdgeId = `${neighborNode}-${current}`;
+      
+      // Use custom distance if available, otherwise use original weight
+      let edgeWeight = neighbor.weight;
+      const customDistance = edgeDistances[edgeId] || edgeDistances[reverseEdgeId];
+      if (customDistance !== undefined) {
+        edgeWeight = customDistance;
+      }
+      
+      // Add delay if present
+      const delay = edgeDelays[edgeId] || edgeDelays[reverseEdgeId] || 0;
+      if (delay > 0) {
+        edgeWeight += delay * 10; // Convert delay minutes to distance penalty
+      }
+
+      // Apply frequency override - if frequency >= 5, use weight of 1 (match Dijkstra behavior)
+      // Try numeric keys first, then fallback to IATA-based keys if available
+      const resolveCode = (id) => {
+        const ap = airports.find(a => String(a.id) === String(id));
+        return ap?.iata || String(id);
+      };
+      const iataEdgeId = `${resolveCode(current)}-${resolveCode(neighborNode)}`;
+      const iataReverseEdgeId = `${resolveCode(neighborNode)}-${resolveCode(current)}`;
+      const frequency = edgeFrequencies[edgeId] || edgeFrequencies[reverseEdgeId] || edgeFrequencies[iataEdgeId] || edgeFrequencies[iataReverseEdgeId] || 1;
+      if (frequency >= 5) {
+        edgeWeight = 1; // Ultra high frequency gets priority weight
+        console.log(`🚨 A* FREQUENCY OVERRIDE: Edge ${edgeId} with frequency ${frequency} gets weight 1`);
+      }
+
+      const tentativeG = gScores.get(current) + edgeWeight;
       
       if (tentativeG < gScores.get(neighborNode)) {
         previous.set(neighborNode, current);
@@ -131,7 +171,6 @@ export function findAStarPath(graph, startNode, endNode, airports, disableAirpor
         fScores.set(neighborNode, f);
         
         pq.enqueue(neighborNode, f);
-        exploredNeighbors++;
       }
     }
   }
@@ -163,6 +202,8 @@ export function findAStarPath(graph, startNode, endNode, airports, disableAirpor
     path,
     totalDistance,
     visited,
-    steps
+    steps,
+    visitedCount: visited.size,
+    frontierCount: 0 // Frontier is empty at completion
   };
 }

@@ -28,14 +28,22 @@ const GraphCanvas = ({
   selectedAirports = [],
   disabledAirports = new Set(),
   edgeDelays = {},
+  edgeFrequencies = {},
+  edgeDistances = {},
   onEdgeDelayChange = () => {},
   onEdgeFrequencyChange = () => {},
-  visualizationMode = 'plane', // 'plane' or 'algorithm'
-  isAirportEditMode = false,
+  onEdgeDistanceChange = () => {},
+  onEdgeTimeChange = () => {},
+  onEdgeTimeUpdate = () => {},
   isEdgeDrawMode = false,
   selectedAirportsForEdge = [],
   showHeuristics = false,
-  selectedAlgorithm = null
+  selectedAlgorithm = null,
+  showToast = () => {},
+  isAirportEditMode = false,
+  visualizationMode = 'plane',
+  isPlaneAnimating = false,
+  showVisualization = false
 }) => {
   // Normalize airport coordinates to fit the container
   const normalizedAirports = useMemo(() => {
@@ -82,7 +90,28 @@ const GraphCanvas = ({
   // Handle edge click
   const handleEdgeClick = useCallback((e, route) => {
     e.stopPropagation();
+    
+    if (!selectedAlgorithm) {
+      showToast('Please select a pathfinding algorithm first', 'warning');
+      return;
+    }
+    
     console.log('Edge clicked:', route);
+    // Block edge selection/modification while plane is animating
+    if (isPlaneAnimating) {
+      showToast && showToast('Cannot edit/select edges during plane animation', 'warning');
+      return;
+    }
+    // Block edge selection in any network management mode
+    if (isAirportEditMode || isEdgeDrawMode) {
+      showToast && showToast('Cannot select or edit edges while in Network Management modes', 'warning');
+      return;
+    }
+    // Block edge selection during active algorithm visualization
+    if (visualizationMode === 'algorithm' && showVisualization) {
+      showToast && showToast('Cannot select or edit edges during visualization', 'warning');
+      return;
+    }
     setSelectedEdge({
       ...route,
       // Add source and target names for the modal
@@ -94,8 +123,8 @@ const GraphCanvas = ({
       departureTime: edgeTimes[route.id]?.departureTime || '08:00',
       arrivalTime: edgeTimes[route.id]?.arrivalTime || '10:00'
     });
-  }, [airports, edgeDelays, edgeTimes]);
-  
+  }, [airports, edgeDelays, selectedAlgorithm, showToast, isPlaneAnimating]);
+
   // Handle delay changes from the modal
   const handleDelayChange = useCallback((edgeId, delay) => {
     onEdgeDelayChange(edgeId, delay);
@@ -125,6 +154,26 @@ const GraphCanvas = ({
       console.log(`Frequency for edge ${edgeId} changed to ${frequency} flights/day`);
     }
   }, [onEdgeFrequencyChange]);
+
+  // Handle distance changes from the modal
+  const handleDistanceChange = useCallback((edgeId, distance) => {
+    console.log(`Distance for edge ${edgeId} changed to ${distance} km`);
+    if (onEdgeDistanceChange) {
+      onEdgeDistanceChange(edgeId, distance);
+    }
+    // Keep the modified edge selected to show its new distance
+    // This will hide other edge details but keep the modified edge visible
+  }, [onEdgeDistanceChange]);
+
+  // Handle time changes from the modal
+  const handleTimeChange = useCallback((edgeId, time) => {
+    console.log(`Time for edge ${edgeId} changed to ${time} minutes`);
+    if (onEdgeTimeChange) {
+      onEdgeTimeChange(edgeId, time);
+    }
+    // Clear edge selection to hide other edge details
+    setSelectedEdge(null);
+  }, [onEdgeTimeChange]);
 
   // Close modal
   const closeModal = useCallback(() => {
@@ -171,6 +220,29 @@ const GraphCanvas = ({
     // Create a map for quick lookup
     const airportMap = new Map(normalizedAirports.map(ap => [ap.id, ap]));
     
+    // Build directed pairs from the highlighted path to detect true backtracking
+    // Example: path A->B->C->B means the pair B->C is a reverse of earlier C->B
+    const pathPairs = [];
+    for (let i = 0; i < (highlightedPath?.length || 0) - 1; i++) {
+      const u = highlightedPath[i];
+      const v = highlightedPath[i + 1];
+      pathPairs.push(`${u}-${v}`);
+    }
+    
+    const seenDirected = new Set();
+    const reverseEdgeSet = new Set(); // holds directed pairs that are true backtracks (reverse of an earlier pair)
+    const pathPairSet = new Set(pathPairs); // quick lookup of used directed pairs
+    
+    for (const pair of pathPairs) {
+      const [u, v] = pair.split('-');
+      const opposite = `${v}-${u}`;
+      if (seenDirected.has(opposite)) {
+        // This pair is a reverse traversal of an earlier segment; mark as back edge
+        reverseEdgeSet.add(pair);
+      }
+      seenDirected.add(pair);
+    }
+
     return routes
       .filter(route => {
         if (!route || !route.source || !route.target) return false;
@@ -188,16 +260,23 @@ const GraphCanvas = ({
         const routeId = `${route.source}-${route.target}`;
         const delay = edgeDelays[routeId] || 0;
         
-        // Check if this route is part of the highlighted path
-        const sourceIndex = highlightedPath.indexOf(route.source);
-        const targetIndex = highlightedPath.indexOf(route.target);
-        const isHighlighted = sourceIndex >= 0 && 
-                            targetIndex >= 0 && 
-                            Math.abs(sourceIndex - targetIndex) === 1;
+        // Determine highlight classes strictly from directed usage/backtracking
+        const dirA = `${route.source}-${route.target}`;
+        const dirB = `${route.target}-${route.source}`;
+        const usedA = pathPairSet.has(dirA);
+        const usedB = pathPairSet.has(dirB);
+        // True backtrack means the directed pair was seen as reverse of an earlier pair
+        const isReverse = reverseEdgeSet.has(dirA) || reverseEdgeSet.has(dirB);
+        // Forward highlight when used in either direction but not marked as reverse backtrack
+        const isForward = (usedA && !reverseEdgeSet.has(dirA)) || (usedB && !reverseEdgeSet.has(dirB));
+        const isHighlighted = isForward || isReverse;
         
         // Calculate midpoint for label positioning
         const midX = (source.x + target.x) / 2;
         const midY = (source.y + target.y) / 2;
+        
+        // Check if this edge has a custom distance
+        const hasCustomDistance = edgeDistances && (edgeDistances[routeId] !== undefined || edgeDistances[`${route.target}-${route.source}`] !== undefined);
         
         return {
           id: routeId,
@@ -214,10 +293,13 @@ const GraphCanvas = ({
           delay,
           delayClass: getDelayClass(delay),
           frequencyClass: getFrequencyClass(route.frequency || 1),
-          isHighlighted
+          isHighlighted,
+          isHighlightedForward: isForward,
+          isHighlightedReverse: isReverse,
+          hasCustomDistance
         };
       });
-  }, [normalizedAirports, routes, highlightedPath, edgeDelays, getDelayClass]);
+  }, [normalizedAirports, routes, highlightedPath, edgeDelays, edgeDistances, getDelayClass]);
 
   // Check if a point is in the viewport
   const isInViewport = useCallback((x, y) => {
@@ -227,6 +309,29 @@ const GraphCanvas = ({
 
   // Heuristic calculation for A* algorithm has been removed
   
+  // Calculate airport business level based on frequency changes
+  const getAirportBusiness = useCallback((airportId) => {
+    let totalFrequency = 0;
+    let routeCount = 0;
+    
+    // Check all routes connected to this airport
+    Object.entries(edgeFrequencies).forEach(([edgeId, frequency]) => {
+      const [source, target] = edgeId.split('-');
+      if (source === airportId || target === airportId) {
+        totalFrequency += frequency;
+        routeCount++;
+      }
+    });
+    
+    if (routeCount === 0) return 'normal';
+    const avgFrequency = totalFrequency / routeCount;
+    
+    if (avgFrequency >= 5) return 'very-busy';
+    if (avgFrequency >= 3) return 'busy';
+    if (avgFrequency >= 2) return 'moderate';
+    return 'normal';
+  }, [edgeFrequencies]);
+
   // Filter out airports outside the viewport
   const visibleAirports = useMemo(() => {
     return normalizedAirports.filter(airport => 
@@ -264,7 +369,7 @@ const GraphCanvas = ({
   }
 
   return (
-    <div className={`graph-canvas ${isAirportEditMode ? 'edit-mode' : ''} ${isEdgeDrawMode ? 'edge-draw-mode' : ''}`} onMouseLeave={handleAirportLeave}>
+    <div className={`graph-canvas ${isAirportEditMode ? 'edit-mode' : ''} ${isEdgeDrawMode ? 'edge-draw-mode' : ''} ${visualizationMode === 'algorithm' ? 'algorithm-mode' : ''}`} onMouseLeave={handleAirportLeave}>
       {/* Airport Tooltip */}
       {hoveredAirport && (
         <div 
@@ -309,7 +414,10 @@ const GraphCanvas = ({
           onClose={() => setSelectedEdge(null)}
           onDelayChange={handleDelayChange}
           onFrequencyChange={handleFrequencyChange}
+          onDistanceChange={handleDistanceChange}
+          onTimeChange={handleTimeChange}
           onTimeUpdate={handleTimeUpdate}
+          showToast={showToast}
         />
       )}
       {/* Routes - Rendered first in DOM but visually behind airports */}
@@ -336,11 +444,12 @@ const GraphCanvas = ({
               className="clickable-route"
               onClick={(e) => handleEdgeClick(e, route)}
               data-route-id={`${route.source}-${route.target}`}
+              style={{ pointerEvents: (isPlaneAnimating || isAirportEditMode || isEdgeDrawMode || (visualizationMode === 'algorithm' && showVisualization)) ? 'none' : 'auto' }}
             />
             
             {/* Visual route line */}
             <line
-              className={`route ${route.isHighlighted ? 'highlighted' : ''} ${route.delayClass || ''} ${visualizationMode === 'algorithm' || visualizationMode === 'plane' ? 'faded' : ''}`}
+              className={`route ${route.isHighlightedForward ? 'highlighted' : ''} ${route.isHighlightedReverse ? 'highlighted-reverse' : ''} ${route.delayClass || ''} ${visualizationMode === 'algorithm' || visualizationMode === 'plane' ? 'faded' : ''}`}
               x1={route.x1}
               y1={route.y1}
               x2={route.x2}
@@ -353,26 +462,30 @@ const GraphCanvas = ({
               }}
             />
             
-            {route.distance && !showHeuristics && !(selectedAlgorithm && selectedAirports.length === 2) && (
+            {route.distance && !showHeuristics && !(selectedAlgorithm && selectedAirports.length === 2) && !selectedEdge && (
+              // Show all labels when no modifications exist, OR show labels for modified edges only
+              (Object.keys(edgeDelays).length === 0 && Object.keys(edgeFrequencies).length === 0 && Object.keys(edgeDistances || {}).length === 0) ||
+              (edgeDelays[route.id] !== undefined || edgeFrequencies[route.id] !== undefined || edgeDistances?.[route.id] !== undefined)
+            ) && (
               <g className="route-label-group">
                 {/* Background for better readability */}
                 <text
                   x={route.midX}
                   y={route.midY - 10}
-                  className={`route-label route-label-bg ${route.delayClass ? route.delayClass + '-bg' : ''}`}
+                  className={`route-label route-label-bg ${route.delayClass ? route.delayClass + '-bg' : ''} ${route.hasCustomDistance ? 'custom-distance-bg' : ''}`}
                   textAnchor="middle"
                   dominantBaseline="middle"
                 >
-                  {route.distance} km{route.delay > 0 ? ` (+${route.delay}m)` : ''}
+                  {route.delay > 0 ? `${route.distance + (route.delay * 10)} km (${route.delay}m delay)` : `${route.distance} km`}
                 </text>
                 <text
                   x={route.midX}
                   y={route.midY - 10}
-                  className={`route-label ${route.delayClass ? route.delayClass + '-text' : ''}`}
+                  className={`route-label ${route.delayClass ? route.delayClass + '-text' : ''} ${route.hasCustomDistance ? 'custom-distance-text' : ''}`}
                   textAnchor="middle"
                   dominantBaseline="middle"
                 >
-                  {route.distance} km{route.delay > 0 ? ` (+${route.delay}m)` : ''}
+                  {route.delay > 0 ? `${route.distance + (route.delay * 10)} km (${route.delay}m delay)` : `${route.distance} km`}
                 </text>
                 
                 {/* Flight frequency indicator - text only */}
@@ -392,30 +505,6 @@ const GraphCanvas = ({
                   </text>
                 </g>
                 
-                {/* Delay indicator */}
-                {route.delay > 0 && !showHeuristics && (
-                  <g>
-                    <circle 
-                      cx={route.midX} 
-                      cy={route.midY} 
-                      r={10} 
-                      fill="rgba(239, 68, 68, 0.8)" 
-                      stroke="#fff" 
-                      strokeWidth="2"
-                    />
-                    <text
-                      x={route.midX}
-                      y={route.midY + 3}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      fill="white"
-                      fontSize="10px"
-                      fontWeight="bold"
-                    >
-                      {route.delay}
-                    </text>
-                  </g>
-                )}
               </g>
             )}
           </g>
@@ -425,21 +514,22 @@ const GraphCanvas = ({
 
       {/* Airports - Rendered second in DOM but visually on top */}
       <div className="airports-layer">
-        {normalizedAirports.map(airport => {
-          const isDisabled = disabledAirports.has(String(airport.id));
+        {visibleAirports.map(airport => {
           const isHighlighted = highlightedPath.includes(airport.id);
+          const isDisabled = disabledAirports.has(airport.id);
+          const businessLevel = getAirportBusiness(airport.id);
           
           return (
             <div
               key={airport.id}
-              className={`airport ${isHighlighted ? 'highlighted' : ''} ${isDisabled ? 'disabled' : ''} ${selectedAirports.some(a => a.id === airport.id) ? 'selected' : ''} ${selectedAirportsForEdge.includes(airport.originalId || airport.id) ? 'selected-for-edge' : ''}`}
+              className={`airport ${isHighlighted ? 'highlighted' : ''} ${isDisabled ? 'disabled' : ''} ${selectedAirports.some(a => a.id === airport.id) ? 'selected' : ''} ${selectedAirportsForEdge.includes(airport.originalId || airport.id) ? 'selected-for-edge' : ''} ${businessLevel}`}
               style={{
                 left: `${airport.x}px`,
                 top: `${airport.y}px`,
                 transform: 'translate(-50%, -50%)',
                 position: 'absolute',
                 zIndex: 10,
-                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                cursor: isDisabled ? 'not-allowed' : (!selectedAlgorithm ? 'not-allowed' : 'pointer'),
                 opacity: isDisabled ? 0.3 : 1,
                 filter: isDisabled ? 'grayscale(100%)' : 'none',
                 transition: 'all 0.5s ease-in-out',
@@ -454,6 +544,32 @@ const GraphCanvas = ({
               <FaPlane className="airport-icon" />
               {isHighlighted && (
                 <div className="airport-pulse" />
+              )}
+              
+              {/* Business level indicators */}
+              {businessLevel === 'moderate' && (
+                <div className="business-indicator moderate">
+                  <div className="crow crow-1">✈</div>
+                  <div className="crow crow-2">✈</div>
+                </div>
+              )}
+              {businessLevel === 'busy' && (
+                <div className="business-indicator busy">
+                  <div className="crow crow-1">✈</div>
+                  <div className="crow crow-2">✈</div>
+                  <div className="crow crow-3">✈</div>
+                  <div className="crow crow-4">✈</div>
+                </div>
+              )}
+              {businessLevel === 'very-busy' && (
+                <div className="business-indicator very-busy">
+                  <div className="crow crow-1">✈</div>
+                  <div className="crow crow-2">✈</div>
+                  <div className="crow crow-3">✈</div>
+                  <div className="crow crow-4">✈</div>
+                  <div className="crow crow-5">✈</div>
+                  <div className="crow crow-6">✈</div>
+                </div>
               )}
               
               {/* A* heuristic visualization has been removed */}
@@ -496,7 +612,8 @@ GraphCanvas.propTypes = {
   highlightedPath: PropTypes.arrayOf(PropTypes.string),
   disabledAirports: PropTypes.instanceOf(Set),
   edgeDelays: PropTypes.object,
-  visualizationMode: PropTypes.oneOf(['plane', 'algorithm'])
+  visualizationMode: PropTypes.oneOf(['plane', 'algorithm']),
+  isPlaneAnimating: PropTypes.bool
 };
 
 export default GraphCanvas;

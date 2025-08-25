@@ -106,7 +106,8 @@ const AStarVisualization = ({
   graph, 
   startNode, 
   endNode, 
-  onComplete = () => {} 
+  onComplete = () => {},
+  onProgress = () => {}
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [visitedNodes, setVisitedNodes] = useState(new Set());
@@ -118,9 +119,14 @@ const AStarVisualization = ({
   const [frontierNodes, setFrontierNodes] = useState(new Set());
   const animationRef = useRef(null);
 
+  // Keep airports in a ref to avoid re-running simulation when array identity changes
+  const airportsRef = useRef(airports);
+  useEffect(() => { airportsRef.current = airports; }, [airports]);
+
   // Simulate A* algorithm step by step
   const simulateAStar = useCallback(() => {
-    if (!graph || !startNode || !endNode || !airports.length) {
+    const airportsData = airportsRef.current || [];
+    if (!graph || !startNode || !endNode || !airportsData.length) {
       console.log('Missing required data for A* simulation');
       return;
     }
@@ -137,7 +143,7 @@ const AStarVisualization = ({
     // Initialize
     graph.getNodes().forEach(node => {
       const g = node === startNode ? 0 : Infinity;
-      const h = calculateHeuristic(node, endNode, airports);
+      const h = calculateHeuristic(node, endNode, airportsData);
       const f = node === startNode ? g + h : Infinity;
       
       dist.set(node, g);
@@ -194,23 +200,13 @@ const AStarVisualization = ({
         break;
       }
       
-      // Create updated maps for this step
+      // Create updated maps for this step (will be used after neighbor expansion)
       const updatedFScores = new Map();
       for (const [node, g] of dist.entries()) {
         const h = heur.get(node);
         updatedFScores.set(node, g === Infinity ? Infinity : g + h);
       }
-      
-      steps.push({
-        step: stepCount,
-        currentNode: current,
-        visited: new Set(visited),
-        distances: new Map(dist),
-        heuristics: new Map(heur),
-        fScores: updatedFScores,
-        frontier: new Set(frontier)
-      });
-      
+
       // Explore neighbors (limited for A*)
       const neighbors = graph.getEdges(current);
       let exploredCount = 0;
@@ -229,33 +225,46 @@ const AStarVisualization = ({
           exploredCount++;
         }
       }
+
+      // After expanding neighbors, record the snapshot so 'frontier' reflects new entries
+      steps.push({
+        step: stepCount,
+        currentNode: current,
+        visited: new Set(visited),
+        distances: new Map(dist),
+        heuristics: new Map(heur),
+        fScores: updatedFScores,
+        frontier: new Set(frontier)
+      });
       
       stepCount++;
     }
     
     console.log(`A* simulation complete: ${steps.length} steps`);
     return steps;
-  }, [graph, startNode, endNode, airports]);
+  }, [graph, startNode, endNode]);
 
   const simulationSteps = useMemo(() => {
-    if (!graph || !startNode || !endNode || !airports.length) {
+    if (!graph || !startNode || !endNode) {
       return [];
     }
     return simulateAStar();
   }, [simulateAStar]);
 
-  useEffect(() => {
-    if (!simulationSteps || simulationSteps.length === 0) {
-      console.log('No simulation steps available');
-      return;
-    }
+  // Use a runId token so only the latest effect run animates (StrictMode-safe)
+  const runIdRef = useRef(0);
 
+  // Animation function to step through A* algorithm visualization
+  const animate = useCallback((myRunId) => {
     let stepIndex = 0;
-    
-    const animate = () => {
+
+    const runAnimation = () => {
+      // If a newer run started, cancel this one
+      if (runIdRef.current !== myRunId) return;
+
       if (stepIndex < simulationSteps.length) {
         const step = simulationSteps[stepIndex];
-        
+
         setCurrentStep(stepIndex);
         setCurrentNode(step.currentNode);
         setVisitedNodes(step.visited);
@@ -263,23 +272,53 @@ const AStarVisualization = ({
         setHeuristics(step.heuristics);
         setFScores(step.fScores);
         setFrontierNodes(step.frontier);
-        
+
+        // Emit live progress metrics to the panel (non-blocking)
+        try {
+          onProgress({
+            algorithmSteps: stepIndex + 1,
+            visitedNodes: step.visited ? step.visited.size : 0,
+            frontierNodes: step.frontier ? step.frontier.size : 0
+          });
+        } catch (_) {}
+
         stepIndex++;
-        animationRef.current = setTimeout(animate, 1200); // Slower for better visibility
+        animationRef.current = setTimeout(runAnimation, 1200); // Slower for better visibility
       } else {
         setIsComplete(true);
-        onComplete();
+        try { onComplete(); } catch(_) {}
       }
     };
 
-    animationRef.current = setTimeout(animate, 500);
+    animationRef.current = setTimeout(runAnimation, 500);
 
     return () => {
       if (animationRef.current) {
         clearTimeout(animationRef.current);
       }
     };
-  }, [simulationSteps, onComplete]);
+  }, [simulationSteps, onComplete, onProgress]);
+
+  useEffect(() => {
+    if (!simulationSteps || simulationSteps.length === 0) {
+      console.log('No simulation steps available');
+      return undefined;
+    }
+
+    // Bump runId and start a fresh animation tied to this id
+    runIdRef.current += 1;
+    const myRunId = runIdRef.current;
+    const cleanup = animate(myRunId);
+
+    return () => {
+      // Invalidate this run
+      runIdRef.current += 1;
+      if (animationRef.current) {
+        clearTimeout(animationRef.current);
+      }
+      if (typeof cleanup === 'function') cleanup();
+    };
+  }, [simulationSteps, animate]);
 
   // Get node color based on A* state
   const getNodeColor = useCallback((nodeId) => {
@@ -458,27 +497,17 @@ const AStarVisualization = ({
         </AnimatePresence>
       </svg>
 
-      {/* A* Status */}
-      <div style={{
-        position: 'absolute',
-        top: '20px',
-        right: '20px',
-        backgroundColor: 'rgba(255, 215, 0, 0.9)',
-        padding: '15px',
-        borderRadius: '8px',
-        color: '#000',
-        fontWeight: 'bold',
-        fontSize: '14px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-      }}>
-        <div>A* Algorithm</div>
-        <div>Step: {currentStep + 1}</div>
-        <div>Visited: {visitedNodes.size}</div>
-        <div>Frontier: {frontierNodes.size}</div>
-        {isComplete && <div style={{ color: '#10B981' }}>✓ Complete</div>}
-      </div>
     </div>
   );
 };
 
-export default AStarVisualization;
+export default React.memo(AStarVisualization, (prev, next) => {
+  const prevKey = (prev.path || []).join('-');
+  const nextKey = (next.path || []).join('-');
+  return (
+    prev.graph === next.graph &&
+    prev.startNode === next.startNode &&
+    prev.endNode === next.endNode &&
+    prevKey === nextKey
+  );
+});

@@ -10,6 +10,26 @@
   display: flex;
 }
 
+/* Prevent grid background changes during algorithm visualization */
+.grid-page.algorithm-visualization {
+  background-color: #0f172a;
+}
+
+/* Faded state for disabled sections */
+.panel-section.faded {
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
+}
+
+.panel-section.faded h3 {
+  color: #64748b;
+}
+
+.panel-section.faded button {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Left Panel */
 .left-panel {
   width: 300px;

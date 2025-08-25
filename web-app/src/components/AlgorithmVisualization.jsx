@@ -18,22 +18,22 @@ const nodeVariants = {
   })
 };
 
-// Colors for different node states
+// Colors for different node states - matching existing dark UI
 const colors = {
-  start: '#10B981',    // Green
-  end: '#EF4444',      // Red
-  current: '#F59E0B',  // Amber
-  visited: '#3B82F6',  // Blue
-  path: '#8B5CF6',     // Purple
-  frontier: '#F59E0B', // Amber
-  default: '#9CA3AF',  // Gray
-  text: '#1F2937',     // Dark gray
-  background: '#F9FAFB',// Light gray
+  start: '#10B981',    // Green (keep)
+  end: '#EF4444',      // Red (keep)
+  current: '#F59E0B',  // Amber (keep)
+  visited: '#475569',  // Dark slate (much less blue)
+  path: '#F59E0B',     // Amber instead of purple
+  frontier: '#94a3b8', // Light slate
+  default: '#64748b',  // Slate gray
+  text: '#f8fafc',     // Light text
+  background: '#0f172a',// Dark background
   distance: {          // Colors for distance labels
     default: '#1F2937',
-    updating: '#10B981',
+    updating: '#F59E0B', // Amber instead of green
     text: '#FFFFFF',
-    background: 'rgba(0, 0, 0, 0.7)'
+    background: 'rgba(15, 23, 42, 0.9)'
   }
 };
 
@@ -71,6 +71,7 @@ const AlgorithmVisualization = ({
   startNode,
   endNode,
   onComplete,
+  onProgress = () => {},
   style
 }) => {
   const [visitedNodes, setVisitedNodes] = useState(new Set());
@@ -83,6 +84,10 @@ const AlgorithmVisualization = ({
   const [nodeDistances, setNodeDistances] = useState({}); // Track current known distances to each node
   const [updatingNodes, setUpdatingNodes] = useState(new Set()); // Track nodes being updated
   const animationRef = useRef();
+  // Track all timeouts so we can clear them on unmount
+  const timeoutsRef = useRef(new Set());
+  // Cancellation flag to prevent late callbacks
+  const cancelledRef = useRef(false);
   
   // Create a map of node positions for quick lookup
   const nodePositions = useMemo(() => {
@@ -130,6 +135,7 @@ const AlgorithmVisualization = ({
 
   // Animate Dijkstra's algorithm exploration
   useEffect(() => {
+    cancelledRef.current = false;
     if (!startNode || !endNode || !graph) return;
     
     // Reset all states
@@ -147,6 +153,11 @@ const AlgorithmVisualization = ({
     const parentMap = {}; // To reconstruct the path
     const visited = new Set();
     let targetFound = false;
+    const emitProgress = () => {
+      try {
+        onProgress({ openSet: priorityQueue.length, closedSet: visited.size });
+      } catch (_) {}
+    };
     
     // Initialize node distances for visualization
     setNodeDistances({ [startNode]: 0 });
@@ -165,6 +176,7 @@ const AlgorithmVisualization = ({
       // Animate the path step by step
       let currentIndex = 0;
       const animateStep = () => {
+        if (cancelledRef.current) return;
         if (currentIndex >= path.length) {
           setIsComplete(true);
           onComplete?.();
@@ -176,6 +188,7 @@ const AlgorithmVisualization = ({
         
         if (currentIndex < path.length) {
           animationRef.current = setTimeout(animateStep, 300); // Adjust speed as needed
+          timeoutsRef.current.add(animationRef.current);
         } else {
           setIsComplete(true);
           onComplete?.();
@@ -184,6 +197,7 @@ const AlgorithmVisualization = ({
       
       // Start the path animation after a short delay
       animationRef.current = setTimeout(animateStep, 500);
+      timeoutsRef.current.add(animationRef.current);
     };
     
     // Function to finish the exploration and show the path
@@ -192,6 +206,11 @@ const AlgorithmVisualization = ({
       if (animationRef.current) {
         clearTimeout(animationRef.current);
       }
+      // Also clear any queued timeouts
+      for (const id of timeoutsRef.current) {
+        clearTimeout(id);
+      }
+      timeoutsRef.current.clear();
       
       // Reconstruct path from end to start
       const path = [];
@@ -213,6 +232,7 @@ const AlgorithmVisualization = ({
     
     // Process one node at a time for visualization
     const processNextNode = () => {
+      if (cancelledRef.current) return;
       // If we've already found the target, don't process more nodes
       if (targetFound || !startNode || !endNode) {
         finishVisualization();
@@ -221,6 +241,7 @@ const AlgorithmVisualization = ({
       
       // If queue is empty, we're done
       if (priorityQueue.length === 0) {
+        emitProgress();
         finishVisualization();
         return;
       }
@@ -231,7 +252,8 @@ const AlgorithmVisualization = ({
       
       // Skip if we already processed this node
       if (visited.has(currentNode)) {
-        setTimeout(processNextNode, 10);
+        const t = setTimeout(processNextNode, 10);
+        timeoutsRef.current.add(t);
         return;
       }
       
@@ -246,6 +268,7 @@ const AlgorithmVisualization = ({
       
       // Mark as visited
       visited.add(currentNode);
+      emitProgress();
       
       // Update visualization
       setVisitedNodes(prev => new Set([...prev, currentNode]));
@@ -263,9 +286,11 @@ const AlgorithmVisualization = ({
       let processedEdges = 0;
       
       const processNextEdge = (index) => {
+        if (cancelledRef.current) return;
         if (index >= edges.length) {
           // All edges processed, move to next node
-          setTimeout(processNextNode, 300);
+          const t = setTimeout(processNextNode, 300);
+          timeoutsRef.current.add(t);
           return;
         }
         
@@ -291,6 +316,7 @@ const AlgorithmVisualization = ({
           // Add to priority queue if not already there
           if (!priorityQueue.some(item => item.node === neighbor)) {
             priorityQueue.push({ node: neighbor, distance: distanceToNeighbor });
+            emitProgress();
           }
           
           // Visualize the distance update with a highlight effect
@@ -301,7 +327,8 @@ const AlgorithmVisualization = ({
           }));
           
           // Remove highlight after animation
-          setTimeout(() => {
+          const t = setTimeout(() => {
+            if (cancelledRef.current) return;
             setUpdatingNodes(prev => {
               const newSet = new Set(prev);
               newSet.delete(neighbor);
@@ -309,6 +336,7 @@ const AlgorithmVisualization = ({
             });
             processNextEdge(index + 1);
           }, 500);
+          timeoutsRef.current.add(t);
         } else {
           // No update, just continue
           processNextEdge(index + 1);
@@ -318,17 +346,21 @@ const AlgorithmVisualization = ({
       // Start processing edges for this node
       processNextEdge(0);
       if (edges.length === 0) {
-        setTimeout(processNextNode, 300);
+        const t = setTimeout(() => { if (cancelledRef.current) return; emitProgress(); processNextNode(); }, 300);
+        timeoutsRef.current.add(t);
       }
     };
     
     // Start the algorithm with a small delay for better visualization
     const startTimer = setTimeout(() => {
+      if (cancelledRef.current) return;
       processNextNode();
     }, 500);
+    timeoutsRef.current.add(startTimer);
     
     // Cleanup function
     return () => {
+      cancelledRef.current = true;
       clearTimeout(startTimer);
       if (animationRef.current) {
         if (typeof animationRef.current === 'number') {
@@ -337,6 +369,10 @@ const AlgorithmVisualization = ({
           clearTimeout(animationRef.current);
         }
       }
+      for (const id of timeoutsRef.current) {
+        clearTimeout(id);
+      }
+      timeoutsRef.current.clear();
     };
   }, [startNode]);
 
@@ -371,8 +407,8 @@ const AlgorithmVisualization = ({
     const isVisited = visitedEdges.has(`${source.id}-${target.id}`) || 
                      visitedEdges.has(`${target.id}-${source.id}`);
     
-    // Use a lighter base color for better contrast
-    let strokeColor = '#E5E0E0';
+    // Use consistent colors with main UI
+    let strokeColor = 'rgba(203, 213, 225, 0.2)';
     let strokeWidth = 1;
     let opacity = 0.3;
     
@@ -385,9 +421,9 @@ const AlgorithmVisualization = ({
       strokeWidth = 3.5;
       opacity = 0.9;
     } else if (isVisited) {
-      strokeColor = '#9CA3AF';
+      strokeColor = '#475569';
       strokeWidth = 1.5;
-      opacity = 0.5;
+      opacity = 0.4;
     }
     
     return (
@@ -398,9 +434,9 @@ const AlgorithmVisualization = ({
           y1={source.y}
           x2={target.x}
           y2={target.y}
-          stroke="#E5E7EB"
+          stroke="rgba(203, 213, 225, 0.1)"
           strokeOpacity={0.2}
-          strokeWidth={3}
+          strokeWidth={2}
         />
         
         {/* Animated edge */}
@@ -545,8 +581,8 @@ const AlgorithmVisualization = ({
             cx={airport.x}
             cy={airport.y}
             r={size * 1.2}
-            fill="rgba(99, 102, 241, 0.3)"
-            initial={{ scale: 0.8, opacity: 0.6 }}
+            fill="rgba(100, 116, 139, 0.2)"
+            initial={{ scale: 0.8, opacity: 0.4 }}
             animate={{
               scale: 1.5,
               opacity: 0,
@@ -585,52 +621,56 @@ const AlgorithmVisualization = ({
             </motion.text>
           )}
           
-          {/* Distance label with background */}
-          <motion.g
-            initial={{ opacity: 0, y: 5 }}
-            animate={{
-              opacity: 1,
-              y: 0,
-              transition: { delay: 0.2 }
-            }}
-          >
-            {/* Background rectangle */}
-            <rect
-              x={airport.x - 15}
-              y={airport.y + size + 2}
-              width={30}
-              height={16}
-              rx={8}
-              ry={8}
-              fill={isUpdating ? colors.distance.updating : colors.distance.background}
-              style={{
-                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))'
+          {/* Distance label with background - only show for start, end, current, and updating nodes */}
+          {(isStart || isEnd || isCurrent || isUpdating) && (
+            <motion.g
+              initial={{ opacity: 0, y: 5 }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                transition: { delay: 0.2 }
               }}
-            />
-            {/* Distance text */}
-            <motion.text
-              x={airport.x}
-              y={airport.y + size + 13}
-              textAnchor="middle"
-              fill={colors.distance.text}
-              fontSize="10px"
-              fontWeight="700"
-              style={{
-                pointerEvents: 'none',
-                userSelect: 'none',
-                textShadow: '0 1px 2px rgba(0,0,0,0.3)'
-              }}
-              animate={isUpdating ? {
-                scale: [1, 1.2, 1],
-                transition: { 
-                  duration: 0.3,
-                  scale: { duration: 0.5 }
-                }
-              } : {}}
             >
-              {distance}
-            </motion.text>
-          </motion.g>
+              {/* Background rectangle */}
+              <rect
+                x={airport.x - 15}
+                y={airport.y + size + 2}
+                width={30}
+                height={16}
+                rx={8}
+                ry={8}
+                fill={isUpdating ? colors.distance.updating : 'rgba(15, 23, 42, 0.9)'}
+                stroke={isStart || isEnd ? '#fff' : 'rgba(255, 255, 255, 0.2)'}
+                strokeWidth={isStart || isEnd ? 1 : 0.5}
+                style={{
+                  filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.4))'
+                }}
+              />
+              {/* Distance text */}
+              <motion.text
+                x={airport.x}
+                y={airport.y + size + 13}
+                textAnchor="middle"
+                fill={colors.distance.text}
+                fontSize="10px"
+                fontWeight="700"
+                style={{
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                }}
+                animate={isUpdating ? {
+                  scale: [1, 1.2, 1],
+                  transition: { 
+                    duration: 0.3,
+                    scale: { duration: 0.5 }
+                  }
+                } : {}}
+              >
+                {distance}
+              </motion.text>
+            </motion.g>
+          )}
         </motion.g>
       </g>
     );
@@ -671,7 +711,7 @@ const AlgorithmVisualization = ({
           key={`path-${i}`}
           d={pathData}
           fill="none"
-          stroke="#4f46e5"
+          stroke="#8B5CF6"
           strokeWidth={4}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -714,7 +754,7 @@ const AlgorithmVisualization = ({
           >
             <FaPlane 
               size={16} 
-              color="#4f46e5"
+              color="#8B5CF6"
               style={{
                 transform: 'translate(-8px, -8px) rotate(90deg)'
               }}
@@ -740,14 +780,14 @@ const AlgorithmVisualization = ({
         {/* Background grid */}
         <defs>
           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e5e7eb" strokeWidth="0.5"/>
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(203, 213, 225, 0.05)" strokeWidth="1"/>
           </pattern>
           
           {/* Wave gradient for exploration effect */}
           <radialGradient id="waveGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-            <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.4" />
-            <stop offset="70%" stopColor="#f59e0b" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#d97706" stopOpacity="0" />
+            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.3" />
+            <stop offset="70%" stopColor="#d97706" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#92400e" stopOpacity="0" />
           </radialGradient>
         </defs>
         <rect width="100%" height="100%" fill="url(#grid)" />
