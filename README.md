@@ -59,9 +59,46 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 
 *Click the thumbnail above to watch the full feature demonstration and see the pathfinding algorithms in action!*
 
-### 🎞️ Quick Demo GIF
-![Demo GIF](./assets/demo.gif)
-*Interactive route finding with real-time pathfinding visualization*
+---
+
+### 🎞️ Interactive Demos
+
+<div align="center">
+  <table>
+    <tr>
+      <td width="50%" align="center">
+        <img src="./assets/dijkstra-demo.gif" alt="Dijkstra Algorithm Demo" width="100%"/>
+        <br/>
+        <strong>🔵 Dijkstra's Algorithm</strong>
+        <br/>
+        <em>Exploring all possible paths systematically</em>
+      </td>
+      <td width="50%" align="center">
+        <img src="./assets/astar-demo.gif" alt="A* Algorithm Demo" width="100%"/>
+        <br/>
+        <strong>⭐ A* Algorithm</strong>
+        <br/>
+        <em>Smart heuristic-guided pathfinding</em>
+      </td>
+    </tr>
+    <tr>
+      <td width="50%" align="center">
+        <img src="./assets/route-visualization.gif" alt="Route Visualization" width="100%"/>
+        <br/>
+        <strong>🗺️ Route Visualization</strong>
+        <br/>
+        <em>Real-time path exploration and selection</em>
+      </td>
+      <td width="50%" align="center">
+        <img src="./assets/performance-comparison.gif" alt="Performance Comparison" width="100%"/>
+        <br/>
+        <strong>📊 Performance Metrics</strong>
+        <br/>
+        <em>Side-by-side algorithm comparison</em>
+      </td>
+    </tr>
+  </table>
+</div>
 
 ---
 
@@ -150,6 +187,14 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 
 ### Dijkstra's Algorithm
 
+<div align="center">
+  <img src="./assets/dijkstra-algorithm.gif" alt="Dijkstra Algorithm Visualization" width="700"/>
+  <br/>
+  <em>Watch Dijkstra's algorithm systematically explore all reachable nodes</em>
+</div>
+
+<br/>
+
 Dijkstra's algorithm guarantees finding the shortest path by exploring nodes in order of their distance from the source.
 
 **Key Characteristics:**
@@ -171,7 +216,17 @@ if (distance < distances.get(neighbor)) {
 }
 ```
 
+---
+
 ### A* (A-Star) Algorithm
+
+<div align="center">
+  <img src="./assets/astar-algorithm.gif" alt="A* Algorithm Visualization" width="700"/>
+  <br/>
+  <em>A* uses smart heuristics to find paths faster by focusing on the goal direction</em>
+</div>
+
+<br/>
 
 A* uses a heuristic function to guide the search toward the goal more efficiently than Dijkstra's algorithm.
 
@@ -199,7 +254,17 @@ where:
   h(n) = heuristic estimate from node n to goal
 ```
 
+---
+
 ### Performance Comparison
+
+<div align="center">
+  <img src="./assets/algorithm-comparison.gif" alt="Algorithm Comparison" width="700"/>
+  <br/>
+  <em>Side-by-side comparison showing A* exploring fewer nodes than Dijkstra</em>
+</div>
+
+<br/>
 
 | Metric | Dijkstra | A* |
 |--------|----------|-----|
@@ -266,15 +331,31 @@ http://localhost:3000
 
 ### Basic Route Finding
 
+<div align="center">
+  <img src="./assets/basic-usage.gif" alt="Basic Route Finding Demo" width="700"/>
+  <br/>
+  <em>Simple steps to find your optimal flight route</em>
+</div>
+
+<br/>
+
 1. **Select Starting Airport**: Choose your departure airport from the dropdown or map
 2. **Select Destination**: Choose your arrival airport
 3. **Choose Algorithm**: Select either Dijkstra or A* algorithm
 4. **Find Route**: Click "Find Path" to calculate the optimal route
 5. **View Results**: See the path, total distance, and visited nodes
 
-![Route Finding](./assets/route-finding.gif)
+---
 
 ### Advanced Features
+
+<div align="center">
+  <img src="./assets/advanced-features.gif" alt="Advanced Features Demo" width="700"/>
+  <br/>
+  <em>Customize routes with delays, frequencies, and custom distances</em>
+</div>
+
+<br/>
 
 #### Adjusting Flight Delays
 ```javascript
@@ -301,13 +382,19 @@ const edgeFrequencies = {
 };
 ```
 
-![Advanced Settings](./assets/advanced-settings.png)
+---
 
 ### Algorithm Comparison
 
-Compare both algorithms side-by-side:
+<div align="center">
+  <img src="./assets/comparison-view.gif" alt="Algorithm Comparison View" width="700"/>
+  <br/>
+  <em>Compare both algorithms side-by-side with real-time metrics</em>
+</div>
 
-![Algorithm Comparison](./assets/comparison.gif)
+<br/>
+
+Compare both algorithms side-by-side:
 
 | Metric | Value |
 |--------|-------|
