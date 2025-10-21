@@ -61,47 +61,6 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 
 ---
 
-### 🎞️ Interactive Demos
-
-<div align="center">
-  <table>
-    <tr>
-      <td width="50%" align="center">
-        <img src="./assets/dijkstra-demo.gif" alt="Dijkstra Algorithm Demo" width="100%"/>
-        <br/>
-        <strong>🔵 Dijkstra's Algorithm</strong>
-        <br/>
-        <em>Exploring all possible paths systematically</em>
-      </td>
-      <td width="50%" align="center">
-        <img src="./assets/astar-demo.gif" alt="A* Algorithm Demo" width="100%"/>
-        <br/>
-        <strong>⭐ A* Algorithm</strong>
-        <br/>
-        <em>Smart heuristic-guided pathfinding</em>
-      </td>
-    </tr>
-    <tr>
-      <td width="50%" align="center">
-        <img src="./assets/route-visualization.gif" alt="Route Visualization" width="100%"/>
-        <br/>
-        <strong>🗺️ Route Visualization</strong>
-        <br/>
-        <em>Real-time path exploration and selection</em>
-      </td>
-      <td width="50%" align="center">
-        <img src="./assets/performance-comparison.gif" alt="Performance Comparison" width="100%"/>
-        <br/>
-        <strong>📊 Performance Metrics</strong>
-        <br/>
-        <em>Side-by-side algorithm comparison</em>
-      </td>
-    </tr>
-  </table>
-</div>
-
----
-
 ## ✨ Features
 
 ### Core Functionality
@@ -114,6 +73,12 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 - ⏱️ **Flight Delay Handling**: Incorporates real-time delay data into route optimization
 - 🔄 **Flight Frequency Analysis**: Prioritizes routes with higher flight frequencies
 
+<div align="center">
+  <img src="./assets/airport-selection.gif" alt="Airport Selection Feature" width="700"/>
+  <br/>
+  <em>Intuitive airport selection with real-time map interaction</em>
+</div>
+
 ### Advanced Features
 
 - 📊 **Algorithm Comparison**: Side-by-side performance metrics
@@ -122,6 +87,12 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 - 🚫 **Dynamic Airport Disabling**: Visualize which airports are excluded during search
 - ⚙️ **Customizable Edge Weights**: Adjust distances, delays, and frequencies
 
+<div align="center">
+  <img src="./assets/node-visualization.gif" alt="Node Visualization" width="700"/>
+  <br/>
+  <em>Real-time visualization of visited nodes during pathfinding</em>
+</div>
+
 ### Technical Highlights
 
 - 🔥 **Hybrid Architecture**: React + C++ integration via CMake
@@ -129,6 +100,12 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 - 🎲 **Priority Queue Optimization**: Min-heap based priority queue for O(log n) operations
 - 🧮 **Heuristic Function**: Haversine distance for A* algorithm guidance
 - 📦 **Modular Design**: Clean separation of concerns with ES6 modules
+
+<div align="center">
+  <img src="./assets/graph-structure.gif" alt="Graph Data Structure" width="700"/>
+  <br/>
+  <em>Dynamic graph construction and edge weight management</em>
+</div>
 
 ---
 
