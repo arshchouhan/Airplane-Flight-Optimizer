@@ -1,13 +1,29 @@
-# ✈️ Flight Route Optimizer
-
 <div align="center">
+
+# ✈️ Flight Route Optimizer ✈️
+
+<div style="font-size: 80px; animation: fly 3s ease-in-out infinite;">
   
+```
+     __|__
+*---o--(_)--o---*
+```
+  
+</div>
+
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![C++](https://img.shields.io/badge/C%2B%2B-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)
 ![CMake](https://img.shields.io/badge/CMake-064F8C?style=for-the-badge&logo=cmake&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 
 **An intelligent flight route optimization system combining React's powerful UI with high-performance C++ pathfinding algorithms**
+
+<style>
+@keyframes fly {
+  0%, 100% { transform: translateX(-20px) translateY(5px); }
+  50% { transform: translateX(20px) translateY(-5px); }
+}
+</style>
 
 [Demo](#demo) • [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Documentation](#documentation)
 
