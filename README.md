@@ -11,7 +11,7 @@
 
 **An intelligent flight route optimization system combining React's powerful UI with high-performance C++ pathfinding algorithms**
 
-[Demo](#demo) • [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Documentation](#documentation)
+[Demo](https://airplane-flight-optimizer.vercel.app/) • [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Documentation](#documentation)
 
 </div>
 
