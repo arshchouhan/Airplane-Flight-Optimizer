@@ -51,7 +51,13 @@ Flight route optimization is a critical challenge in modern aviation that direct
 
 AI systems can identify counter-intuitive routes that result in shorter flight times by leveraging factors like wind patterns and jet streams that might be overlooked in traditional flight planning. This project demonstrates these pathfinding principles in an interactive, educational format.
 
-**Learn More:** For an in-depth exploration of AI-driven flight optimization, read this comprehensive analysis: [AI-Driven Flight Path Optimization: Enhancing Safety and Efficiency in Aviation](https://medium.com/thedeephub/ai-driven-flight-path-optimi-enhancing-safety-and-efficiency-in-aviation-e9aca949334a)
+<div align="center">
+  <a href="https://medium.com/thedeephub/ai-driven-flight-path-optimi-enhancing-safety-and-efficiency-in-aviation-e9aca949334a">
+    <img src="https://miro.medium.com/v2/resize:fit:1100/format:webp/1*eUkuiaVMx7umcDio0A0N-g.png" alt="AI-Driven Flight Path Optimization" width="700"/>
+  </a>
+  <br/>
+  <em><strong>Learn More:</strong> <a href="https://medium.com/thedeephub/ai-driven-flight-path-optimi-enhancing-safety-and-efficiency-in-aviation-e9aca949334a">AI-Driven Flight Path Optimization: Enhancing Safety and Efficiency in Aviation</a></em>
+</div>
 
 ---
 
