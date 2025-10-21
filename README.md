@@ -53,20 +53,13 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 ### 🌐 Live Application
 **Try it now:** [https://airplane-flight-optimizer.vercel.app](https://airplane-flight-optimizer.vercel.app)
 
-### 📹 Demo Video
-For videos, you have several options:
+### 📹 Video Walkthrough
 
-**Option 1: Link to external video (YouTube/Vimeo)**
-```markdown
-[![Watch Demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/maxresdefault.jpg)](https://youtu.be/YOUR_VIDEO_ID)
-```
+[![Flight Route Optimizer Demo](https://img.youtube.com/vi/hCZcCpogOiY/maxresdefault.jpg)](https://youtu.be/hCZcCpogOiY)
 
-**Option 2: Embed video from your repo**
-```markdown
-https://user-images.githubusercontent.com/YOUR_USER_ID/YOUR_VIDEO.mp4
-```
+*Click the thumbnail above to watch the full feature demonstration and see the pathfinding algorithms in action!*
 
-**Option 3: GIF Demo**
+### 🎞️ Quick Demo GIF
 ![Demo GIF](./assets/demo.gif)
 *Interactive route finding with real-time pathfinding visualization*
 
