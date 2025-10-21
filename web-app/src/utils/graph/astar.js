@@ -155,8 +155,14 @@ export function findAStarPath(graph, startNode, endNode, airports, disableAirpor
       const iataReverseEdgeId = `${resolveCode(neighborNode)}-${resolveCode(current)}`;
       const frequency = edgeFrequencies[edgeId] || edgeFrequencies[reverseEdgeId] || edgeFrequencies[iataEdgeId] || edgeFrequencies[iataReverseEdgeId] || 1;
       if (frequency >= 5) {
-        edgeWeight = 1; // Ultra high frequency gets priority weight
-        console.log(`🚨 A* FREQUENCY OVERRIDE: Edge ${edgeId} with frequency ${frequency} gets weight 1`);
+        // Check if this specific edge is disabled
+        const isDisabled = edgeDelays[edgeId] === Infinity || edgeDelays[reverseEdgeId] === Infinity;
+        if (!isDisabled) {
+          edgeWeight = 1; // Ultra high frequency gets priority weight
+          console.log(`🚨 A* FREQUENCY OVERRIDE: Edge ${edgeId} with frequency ${frequency} gets weight 1`);
+        } else {
+          console.log(`⚠️ A* FREQUENCY OVERRIDE SKIPPED: Edge ${edgeId} is disabled`);
+        }
       }
 
       const tentativeG = gScores.get(current) + edgeWeight;

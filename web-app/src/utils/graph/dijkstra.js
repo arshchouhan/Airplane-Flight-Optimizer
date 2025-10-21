@@ -1,19 +1,106 @@
 class PriorityQueue {
   constructor() {
-    this.elements = [];
+    this.heap = [];
   }
 
-  enqueue(element, priority) {
-    this.elements.push({ element, priority });
-    this.elements.sort((a, b) => a.priority - b.priority);
+  // Get parent index
+  _parent(index) {
+    return Math.floor((index - 1) / 2);
   }
 
-  dequeue() {
-    return this.elements.shift();
+  // Get left child index
+  _leftChild(index) {
+    return 2 * index + 1;
   }
 
+  // Get right child index
+  _rightChild(index) {
+    return 2 * index + 2;
+  }
+
+  // Check if the heap is empty
   isEmpty() {
-    return this.elements.length === 0;
+    return this.heap.length === 0;
+  }
+
+  // Get the size of the heap
+  size() {
+    return this.heap.length;
+  }
+
+  // Swap two elements in the heap
+  _swap(i, j) {
+    [this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]];
+  }
+
+  // Add an element to the priority queue
+  enqueue(element, priority) {
+    // Create a new node
+    const node = { element, priority };
+    // Add the new node to the end of the heap
+    this.heap.push(node);
+    // Move the node up to maintain the heap property
+    this._siftUp();
+  }
+
+  // Remove and return the element with the highest priority (lowest priority number)
+  dequeue() {
+    if (this.isEmpty()) {
+      return null;
+    }
+    
+    // Get the root element (highest priority)
+    const root = this.heap[0];
+    // Get the last element
+    const last = this.heap.pop();
+    
+    // If there are remaining elements, put the last element at the root and sift down
+    if (!this.isEmpty()) {
+      this.heap[0] = last;
+      this._siftDown(0);
+    }
+    
+    return root;
+  }
+
+  // Move the element at the given index up to maintain the heap property
+  _siftUp() {
+    let index = this.heap.length - 1;
+    
+    while (index > 0) {
+      const parentIndex = this._parent(index);
+      
+      // If the parent has lower or equal priority, we're done
+      if (this.heap[parentIndex].priority <= this.heap[index].priority) {
+        break;
+      }
+      
+      // Otherwise, swap with parent
+      this._swap(parentIndex, index);
+      index = parentIndex;
+    }
+  }
+
+  // Move the element at the given index down to maintain the heap property
+  _siftDown(index) {
+    const left = this._leftChild(index);
+    const right = this._rightChild(index);
+    let smallest = index;
+    
+    // Find the index of the node with the smallest priority among the current node and its children
+    if (left < this.heap.length && this.heap[left].priority < this.heap[smallest].priority) {
+      smallest = left;
+    }
+    
+    if (right < this.heap.length && this.heap[right].priority < this.heap[smallest].priority) {
+      smallest = right;
+    }
+    
+    // If the smallest priority is not the current node, swap and continue sifting down
+    if (smallest !== index) {
+      this._swap(index, smallest);
+      this._siftDown(smallest);
+    }
   }
 }
 
@@ -91,11 +178,17 @@ function findShortestPath(graph, sourceId, targetId, edgeDelays = {}, edgeDistan
         edgeWeight += delay * 10; // Convert delay minutes to distance penalty
       }
       
-      // Apply frequency override - if frequency >= 5, use weight of 1
+      // Apply frequency override - if frequency >= 5, use weight of 1, but only if not disabled
       const frequency = edgeFrequencies[edgeId] || edgeFrequencies[reverseEdgeId] || 1;
       if (frequency >= 5) {
-        edgeWeight = 1; // Ultra high frequency gets priority weight
-        console.log(`🚨 DIJKSTRA FREQUENCY OVERRIDE: Edge ${edgeId} with frequency ${frequency} gets weight 1`);
+        // Check if this specific edge is disabled
+        const isDisabled = edgeDelays[edgeId] === Infinity || edgeDelays[reverseEdgeId] === Infinity;
+        if (!isDisabled) {
+          edgeWeight = 1; // Ultra high frequency gets priority weight
+          console.log(`🚨 DIJKSTRA FREQUENCY OVERRIDE: Edge ${edgeId} with frequency ${frequency} gets weight 1`);
+        } else {
+          console.log(`⚠️ DIJKSTRA FREQUENCY OVERRIDE SKIPPED: Edge ${edgeId} is disabled`);
+        }
       }
 
       const distance = currentDistance + edgeWeight;

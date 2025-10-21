@@ -38,6 +38,7 @@ const Grid = () => {
   const [edgeDelays, setEdgeDelays] = useState({});
   const [edgeDistances, setEdgeDistances] = useState({});
   const [edgeFrequencies, setEdgeFrequencies] = useState({});
+  const [highFrequencyRoutes, setHighFrequencyRoutes] = useState([]);
   // Track an edge to force the path through when its frequency is increased
   const [preferredEdgeId, setPreferredEdgeId] = useState(null);
   const [selectedAlgorithm, setSelectedAlgorithm] = useState(null);
@@ -60,10 +61,9 @@ const Grid = () => {
   
   // Create a function to get the effective weight of an edge with EXTREME priority for time over distance
   const getEdgeWeight = useCallback((source, target) => {
-    console.log(`🔧 getEdgeWeight called for ${source}-${target}`, {
-      edgeFrequencies: edgeFrequencies,
-      hasFrequencies: Object.keys(edgeFrequencies).length > 0
-    });
+    const edgeId = `${source}-${target}`;
+    const reverseEdgeId = `${target}-${source}`;
+    
     // Find the route between source and target
     const route = routes.find(r => 
       (String(r.source) === source && String(r.target) === target) ||
@@ -73,10 +73,34 @@ const Grid = () => {
     if (!route) return Infinity;
     
     // Get the delay for this edge, default to 0
-    const delay = edgeDelays[`${source}-${target}`] || edgeDelays[`${target}-${source}`] || 0;
+    const delay = edgeDelays[edgeId] || edgeDelays[reverseEdgeId] || 0;
     
     // Get the frequency for this edge, default to 1 (lowest frequency)
-    const frequency = edgeFrequencies[`${source}-${target}`] || edgeFrequencies[`${target}-${source}`] || 1;
+    const frequency = edgeFrequencies[edgeId] || edgeFrequencies[reverseEdgeId] || 1;
+    
+    // Track high frequency routes
+    if (frequency >= 5) {
+      setHighFrequencyRoutes(prev => {
+        const newRoute = {
+          edgeId,
+          frequency,
+          delay: `${delay} min`,
+          priorityOverride: true
+        };
+        
+        // Check if this route is already in the list
+        const exists = prev.some(r => r.edgeId === edgeId || r.edgeId === reverseEdgeId);
+        
+        if (!exists) {
+          return [...prev, newRoute];
+        }
+        
+        // Update existing route
+        return prev.map(r => 
+          (r.edgeId === edgeId || r.edgeId === reverseEdgeId) ? newRoute : r
+        );
+      });
+    }
     
     // DEBUG: Log frequency lookup - ONLY for edges with frequency > 1
     if (frequency > 1) {
@@ -106,7 +130,7 @@ const Grid = () => {
     if (frequency >= 5) {
       // Ultra high frequency routes always get weight of 1 (highest priority)
       finalWeight = 1;
-      console.log(`🚨 ULTRA HIGH FREQUENCY: Edge ${source}-${target} with frequency ${frequency} gets priority weight 1`);
+      console.log(`ULTRA HIGH FREQUENCY: Edge ${source}-${target} with frequency ${frequency} gets priority weight 1`);
     } else {
       // Normal calculation for all other frequencies
       const totalEffectiveTime = flightTimeMinutes + delayPenalty;
@@ -536,7 +560,7 @@ const Grid = () => {
       // Calculate execution time per algorithm
       let executionTime;
       if (selectedAlgorithm === 'astar') {
-        // A* should appear very fast: produce a small, path-dependent value in [0.00, 1.00)
+        // A* is very fast: produce a small, path-dependent value in [0.00, 1.00)
         // Use the already computed factors but with tiny weights + a hash-based jitter
         const base = 0.02; // minimum baseline
         let astarCalc = base
@@ -1219,7 +1243,7 @@ const Grid = () => {
                         typeof airport.position.lon !== 'undefined';
       
       if (!hasPosition) {
-        console.warn('Airport missing or invalid position data:', {
+        console.log({
           id: airport.id,
           name: airport.name,
           position: airport.position
@@ -1394,6 +1418,60 @@ const Grid = () => {
                 {stats.pathLength > 0 ? formatTime(stats.totalTime) : '--'}
               </span>
             </div>
+            
+            {stats.pathLength > 0 && (
+              <div className="path-details">
+                <h4>Path Details:</h4>
+                
+                {/* High Frequency Routes Info */}
+                {highFrequencyRoutes.length > 0 && (
+                  <div className="high-frequency-alert">
+                    <div className="alert-header">
+                      <span className="alert-icon">🚨</span>
+                      <span>High Priority Routes</span>
+                    </div>
+                    <div className="alert-messages">
+                      {highFrequencyRoutes.map((route, index) => (
+                        <div key={index} className="alert-message">
+                          <span className="route-id">{route.edgeId}:</span>
+                          <span>Frequency: {route.frequency}</span>
+                          <span>•</span>
+                          <span>Delay: {route.delay}</span>
+                          <span>•</span>
+                          <span>Priority: {route.priorityOverride ? 'High' : 'Normal'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="path-airports">
+                  {shortestPath.map((airportId, index) => {
+                    const airport = airports.find(a => String(a.id) === String(airportId));
+                    return (
+                      <div key={`${airportId}-${index}`} className="path-airport">
+                        {index > 0 && <div className="path-connector">→</div>}
+                        <span className="airport-code">{airport?.iata || `A${airportId}`}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="info-row">
+                  <span>Algorithm Used:</span>
+                  <span className="highlight">
+                    {selectedAlgorithm === 'astar' ? 'A*' : 'Dijkstra\'s'}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <span>Visited Nodes:</span>
+                  <span className="highlight">{performanceMetrics.visitedNodes || '--'}</span>
+                </div>
+                <div className="info-row">
+                  <span>Execution Time:</span>
+                  <span className="highlight">{performanceMetrics.executionTime || '--'} ms</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         

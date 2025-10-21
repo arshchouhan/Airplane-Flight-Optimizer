@@ -228,6 +228,157 @@
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* Path Details Section */
+.path-details {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.path-details h4 {
+  margin: 0 0 1rem 0;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.path-airports {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+
+.path-airport {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.path-airport:hover .airport-code {
+  background: #3b82f6;
+  transform: translateY(-1px);
+}
+
+.airport-code {
+  background: rgba(74, 90, 239, 0.2);
+  color: #60a5fa;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.path-connector {
+  color: #4b5563;
+  font-weight: bold;
+  margin: 0 0.25rem;
+  opacity: 0.7;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #cbd5e1;
+}
+
+.info-row:last-child {
+  margin-bottom: 0;
+}
+
+.info-row span:first-child {
+  color: #94a3b8;
+}
+
+.info-row .highlight {
+  color: #60a5fa;
+  font-weight: 500;
+  font-family: 'Fira Code', 'Courier New', monospace;
+}
+
+/* High Frequency Alert */
+.high-frequency-alert {
+  margin-bottom: 1.5rem;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: 8px;
+  padding: 0.75rem;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.high-frequency-alert .alert-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  color: #fbbf24;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.high-frequency-alert .alert-icon {
+  margin-right: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.high-frequency-alert .alert-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.high-frequency-alert .alert-message {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #fef3c7;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.high-frequency-alert .route-id {
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-weight: 600;
+  color: #fcd34d;
+}
+
+.high-frequency-alert .alert-message > span:not(.route-id) {
+  opacity: 0.9;
+}
+
+.high-frequency-alert .alert-message > span:not(:last-child)::after {
+  content: '•';
+  margin-left: 0.5rem;
+  opacity: 0.6;
+}
+
+.high-frequency-alert .alert-message > span:last-child::after {
+  display: none;
+}
+
+/* Animation for path details */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .selected-airport {
   padding: 8px;
   border-radius: 4px;
