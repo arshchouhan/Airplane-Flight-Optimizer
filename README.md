@@ -526,9 +526,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Contact
 
-- **GitHub**: [@yourusername](https://github.com/arshchouhan)
+- **GitHub**: [https://github.com/arshchouhan]
 - **Email**: arshchouhan004@gmail.com
-- **Project Link**: [https://github.com/yourusername/flight-route-optimizer](https://github.com/yourusername/flight-route-optimizer)
+- **Project Link**: [https://github.com/arshchouhan/Airplane-Flight-Optimizer](https://github.com/yourusername/flight-route-optimizer)
 
 ---
 
