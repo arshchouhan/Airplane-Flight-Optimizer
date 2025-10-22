@@ -11,7 +11,7 @@
 
 **An intelligent flight route optimization system combining React's powerful UI with high-performance C++ pathfinding algorithms**
 
-[Demo](#demo) • [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Documentation](#documentation)
+[🚀 Live Demo](https://airplane-flight-optimizer.vercel.app) • [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Documentation](#documentation)
 
 </div>
 
@@ -40,23 +40,37 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 
 ### Why This Project?
 
-- 🚀 **Real-world Application**: Solves actual route optimization problems faced by airlines and travelers
-- 🧠 **Algorithm Comparison**: Implements both Dijkstra's and A* algorithms for performance analysis
-- ⚡ **High Performance**: C++ backend for computationally intensive pathfinding operations
-- 🎨 **Beautiful UI**: Interactive React interface with real-time visualization
+Flight route optimization is a critical challenge in modern aviation that directly impacts safety, efficiency, and sustainability. Traditional flight planning methods often rely on static data and manual calculations, but the aviation industry is experiencing a revolution through AI-driven optimization that can dynamically account for weather patterns, air traffic, and real-time conditions.
+
+**Real-World Impact:**
+- 🚀 **Real-world Application**: AI-driven flight path optimization can reduce flight times significantly—for example, optimizing routes from Montreal to Shanghai showed potential time savings of over 5 hours compared to traditional straight-line approaches
+- 🧠 **Algorithm Comparison**: Implements both Dijkstra's and A* algorithms for performance analysis, demonstrating how different pathfinding strategies affect route efficiency
+- ⚡ **High Performance**: C++ backend for computationally intensive pathfinding operations with real-time graph processing
+- 🎨 **Beautiful UI**: Interactive React interface with real-time visualization of algorithm exploration
 - 📊 **Data-Driven**: Works with real airport data including coordinates, distances, and flight frequencies
+
+AI systems can identify counter-intuitive routes that result in shorter flight times by leveraging factors like wind patterns and jet streams that might be overlooked in traditional flight planning. This project demonstrates these pathfinding principles in an interactive, educational format.
+
+<div align="center">
+  <a href="https://medium.com/thedeephub/ai-driven-flight-path-optimi-enhancing-safety-and-efficiency-in-aviation-e9aca949334a">
+    <img src="https://miro.medium.com/v2/resize:fit:1100/format:webp/1*eUkuiaVMx7umcDio0A0N-g.png" alt="AI-Driven Flight Path Optimization" width="700"/>
+  </a>
+  <br/>
+  <em><strong>Learn More:</strong> <a href="https://medium.com/thedeephub/ai-driven-flight-path-optimi-enhancing-safety-and-efficiency-in-aviation-e9aca949334a">AI-Driven Flight Path Optimization: Enhancing Safety and Efficiency in Aviation</a></em>
+</div>
 
 ---
 
 ## 🎬 Demo
 
-### Live Demo
-![Demo GIF](./assets/demo.gif)
-*Interactive route finding with real-time pathfinding visualization*
+### 🌐 Live Application
+**Try it now:** [https://airplane-flight-optimizer.vercel.app](https://airplane-flight-optimizer.vercel.app)
 
-### Video Walkthrough
-[![Video Demo](./assets/video-thumbnail.png)](./assets/demo-video.mp4)
-*Click to watch the full feature demonstration*
+### 📹 Video Walkthrough
+
+[![Flight Route Optimizer Demo](https://img.youtube.com/vi/hCZcCpogOiY/maxresdefault.jpg)](https://youtu.be/hCZcCpogOiY)
+
+*Click the thumbnail above to watch the full feature demonstration and see the pathfinding algorithms in action!*
 
 ---
 
@@ -72,6 +86,12 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 - ⏱️ **Flight Delay Handling**: Incorporates real-time delay data into route optimization
 - 🔄 **Flight Frequency Analysis**: Prioritizes routes with higher flight frequencies
 
+<div align="center">
+  <img src="./assets/airport-selection.gif" alt="Airport Selection Feature" width="700"/>
+  <br/>
+  <em>Intuitive airport selection with real-time map interaction</em>
+</div>
+
 ### Advanced Features
 
 - 📊 **Algorithm Comparison**: Side-by-side performance metrics
@@ -80,6 +100,12 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 - 🚫 **Dynamic Airport Disabling**: Visualize which airports are excluded during search
 - ⚙️ **Customizable Edge Weights**: Adjust distances, delays, and frequencies
 
+<div align="center">
+  <img src="./assets/node-visualization.gif" alt="Node Visualization" width="700"/>
+  <br/>
+  <em>Real-time visualization of visited nodes during pathfinding</em>
+</div>
+
 ### Technical Highlights
 
 - 🔥 **Hybrid Architecture**: React + C++ integration via CMake
@@ -87,6 +113,12 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 - 🎲 **Priority Queue Optimization**: Min-heap based priority queue for O(log n) operations
 - 🧮 **Heuristic Function**: Haversine distance for A* algorithm guidance
 - 📦 **Modular Design**: Clean separation of concerns with ES6 modules
+
+<div align="center">
+  <img src="./assets/graph-structure.gif" alt="Graph Data Structure" width="700"/>
+  <br/>
+  <em>Dynamic graph construction and edge weight management</em>
+</div>
 
 ---
 
@@ -145,6 +177,14 @@ The **Flight Route Optimizer** is a sophisticated web application that finds the
 
 ### Dijkstra's Algorithm
 
+<div align="center">
+  <img src="./assets/dijkstra-algorithm.gif" alt="Dijkstra Algorithm Visualization" width="700"/>
+  <br/>
+  <em>Watch Dijkstra's algorithm systematically explore all reachable nodes</em>
+</div>
+
+<br/>
+
 Dijkstra's algorithm guarantees finding the shortest path by exploring nodes in order of their distance from the source.
 
 **Key Characteristics:**
@@ -166,7 +206,17 @@ if (distance < distances.get(neighbor)) {
 }
 ```
 
+---
+
 ### A* (A-Star) Algorithm
+
+<div align="center">
+  <img src="./assets/astar-algorithm.gif" alt="A* Algorithm Visualization" width="700"/>
+  <br/>
+  <em>A* uses smart heuristics to find paths faster by focusing on the goal direction</em>
+</div>
+
+<br/>
 
 A* uses a heuristic function to guide the search toward the goal more efficiently than Dijkstra's algorithm.
 
@@ -194,7 +244,17 @@ where:
   h(n) = heuristic estimate from node n to goal
 ```
 
+---
+
 ### Performance Comparison
+
+<div align="center">
+  <img src="./assets/algorithm-comparison.gif" alt="Algorithm Comparison" width="700"/>
+  <br/>
+  <em>Side-by-side comparison showing A* exploring fewer nodes than Dijkstra</em>
+</div>
+
+<br/>
 
 | Metric | Dijkstra | A* |
 |--------|----------|-----|
@@ -261,15 +321,31 @@ http://localhost:3000
 
 ### Basic Route Finding
 
+<div align="center">
+  <img src="./assets/basic-usage.gif" alt="Basic Route Finding Demo" width="700"/>
+  <br/>
+  <em>Simple steps to find your optimal flight route</em>
+</div>
+
+<br/>
+
 1. **Select Starting Airport**: Choose your departure airport from the dropdown or map
 2. **Select Destination**: Choose your arrival airport
 3. **Choose Algorithm**: Select either Dijkstra or A* algorithm
 4. **Find Route**: Click "Find Path" to calculate the optimal route
 5. **View Results**: See the path, total distance, and visited nodes
 
-![Route Finding](./assets/route-finding.gif)
+---
 
 ### Advanced Features
+
+<div align="center">
+  <img src="./assets/advanced-features.gif" alt="Advanced Features Demo" width="700"/>
+  <br/>
+  <em>Customize routes with delays, frequencies, and custom distances</em>
+</div>
+
+<br/>
 
 #### Adjusting Flight Delays
 ```javascript
@@ -296,13 +372,19 @@ const edgeFrequencies = {
 };
 ```
 
-![Advanced Settings](./assets/advanced-settings.png)
+---
 
 ### Algorithm Comparison
 
-Compare both algorithms side-by-side:
+<div align="center">
+  <img src="./assets/comparison-view.gif" alt="Algorithm Comparison View" width="700"/>
+  <br/>
+  <em>Compare both algorithms side-by-side with real-time metrics</em>
+</div>
 
-![Algorithm Comparison](./assets/comparison.gif)
+<br/>
+
+Compare both algorithms side-by-side:
 
 | Metric | Value |
 |--------|-------|
