@@ -17,23 +17,6 @@
 
 ---
 
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Demo](#demo)
-- [Key Features](#features)
-- [Architecture](#architecture)
-- [Algorithms](#algorithms)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Screenshots](#screenshots)
-- [API Reference](#api-reference)
-- [Performance](#performance)
-- [Contributing](#contributing)
-- [License](#license)
-
----
-
 ## 🌐 Overview
 
 The **Flight Route Optimizer** is a sophisticated web application that finds the most efficient flight paths between airports worldwide. Built with React for an interactive frontend experience and powered by advanced pathfinding algorithms implemented in both JavaScript and C++, this project demonstrates the perfect synergy between modern web technologies and classical computer science algorithms.
