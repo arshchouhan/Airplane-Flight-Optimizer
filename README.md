@@ -379,25 +379,6 @@ Compare both algorithms side-by-side:
 
 ---
 
-## 📸 Screenshots
-
-### Main Dashboard
-![Dashboard](./assets/dashboard.png)
-*Clean, intuitive interface for route selection and visualization*
-
-### Pathfinding in Action
-![Pathfinding](./assets/pathfinding-visualization.png)
-*Real-time visualization of the algorithm exploring the graph*
-
-### Results View
-![Results](./assets/results.png)
-*Comprehensive results with metrics and path details*
-
-### Algorithm Metrics
-![Metrics](./assets/metrics-comparison.png)
-*Side-by-side performance comparison between algorithms*
-
----
 
 ## 📚 API Reference
 
