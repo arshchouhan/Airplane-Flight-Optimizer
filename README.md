@@ -526,8 +526,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Contact
 
-- **GitHub**: [@yourusername](https://github.com/yourusername)
-- **Email**: your.email@example.com
+- **GitHub**: [@yourusername](https://github.com/arshchouhan)
+- **Email**: arshchouhan004@gmail.com
 - **Project Link**: [https://github.com/yourusername/flight-route-optimizer](https://github.com/yourusername/flight-route-optimizer)
 
 ---
@@ -550,8 +550,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <div align="center">
-
-**Built with ❤️ using React, C++, and CMake**
 
 ⭐ Star us on GitHub — it motivates us a lot!
 
